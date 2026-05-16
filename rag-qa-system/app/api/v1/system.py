@@ -1,15 +1,17 @@
 """
 RAG 问答系统 - 系统管理 API 模块
-提供健康检查、统计信息等系统接口
+提供健康检查、统计信息、系统配置管理等接口
 """
 
-from fastapi import APIRouter, Depends
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.services.document_service import document_service
 from app.services.knowledge_service import knowledge_service
+from app.services.system_config_service import SystemConfigService
 from app.core.database import check_db_connection
 from app.core.vectorstore import vector_store
 from app.core.cache import redis_cache
@@ -235,7 +237,7 @@ def update_config(config_req: ConfigUpdateRequest):
 def get_runtime_config():
     """
     获取运行时配置
-    
+
     **出参说明：**
     - 当前生效的运行时配置
     """
@@ -243,4 +245,233 @@ def get_runtime_config():
         "success": True,
         "message": "运行时配置获取成功",
         "data": runtime_config.get_all(),
+    }
+
+
+# ==================== 数据库配置管理接口 ====================
+
+class ConfigItemUpdate(BaseModel):
+    """配置项更新请求"""
+    value: str
+
+
+class ConfigItemCreate(BaseModel):
+    """配置项创建请求"""
+    key: str
+    value: str
+    value_type: str = "string"
+    group: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    editable: bool = True
+    sensitive: bool = False
+
+
+class ConfigBatchUpdate(BaseModel):
+    """批量配置更新请求"""
+    configs: dict  # {key: value}
+
+
+@router.get(
+    "/configs",
+    summary="获取所有系统配置",
+    description="获取数据库中存储的所有系统配置，支持按分组筛选。",
+)
+def get_all_configs(
+    group: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    获取所有系统配置
+
+    **入参说明：**
+    - `group`: 可选，按分组筛选
+
+    **出参说明：**
+    - 配置列表
+    """
+    service = SystemConfigService(db)
+
+    # 如果没有配置，初始化默认配置
+    if service.get_all_configs().__len__() == 0:
+        count = service.initialize_default_configs()
+        logger.info(f"Initialized {count} default configs")
+
+    if group:
+        configs = service.get_configs_by_group(group)
+    else:
+        configs = service.get_all_configs()
+
+    return {
+        "success": True,
+        "message": "获取成功",
+        "data": [
+            {
+                "key": c.key,
+                "value": c.value if not c.sensitive else ("*" * 8) if c.value else "",
+                "raw_value": c.value if not c.sensitive else None,
+                "value_type": c.value_type,
+                "group": c.group,
+                "name": c.name,
+                "description": c.description,
+                "editable": c.editable,
+                "sensitive": c.sensitive,
+            }
+            for c in configs
+        ],
+    }
+
+
+@router.get(
+    "/configs/groups",
+    summary="获取配置分组",
+    description="获取所有配置分组及其名称。",
+)
+def get_config_groups(db: Session = Depends(get_db)):
+    """获取所有配置分组"""
+    service = SystemConfigService(db)
+    groups = service.get_grouped_configs()
+    # get_groups_with_names() returns List[Dict], convert to dict for lookup
+    groups_name_map = {g["key"]: g["name"] for g in service.get_groups_with_names()}
+
+    return {
+        "success": True,
+        "message": "获取成功",
+        "data": [
+            {"key": key, "name": groups_name_map.get(key, key), "count": len(configs)}
+            for key, configs in groups.items()
+        ],
+    }
+
+
+@router.get(
+    "/configs/grouped",
+    summary="获取分组后的配置",
+    description="获取按分组组织的系统配置。",
+)
+def get_grouped_configs(db: Session = Depends(get_db)):
+    """获取分组后的配置"""
+    service = SystemConfigService(db)
+
+    # 如果没有配置，初始化默认配置
+    if service.get_all_configs().__len__() == 0:
+        count = service.initialize_default_configs()
+        logger.info(f"Initialized {count} default configs")
+
+    grouped = service.get_grouped_configs()
+
+    return {
+        "success": True,
+        "message": "获取成功",
+        "data": grouped,
+    }
+
+
+@router.get(
+    "/configs/{config_key}",
+    summary="获取单个配置",
+    description="根据键名获取配置详情。",
+)
+def get_config(config_key: str, db: Session = Depends(get_db)):
+    """获取单个配置"""
+    service = SystemConfigService(db)
+    config = service.get_config_by_key(config_key)
+
+    if not config:
+        raise HTTPException(status_code=404, detail="配置不存在")
+
+    return {
+        "success": True,
+        "message": "获取成功",
+        "data": {
+            "key": config.key,
+            "value": config.value if not config.sensitive else ("*" * 8) if config.value else "",
+            "raw_value": config.value if not config.sensitive else None,
+            "value_type": config.value_type,
+            "group": config.group,
+            "name": config.name,
+            "description": config.description,
+            "editable": config.editable,
+            "sensitive": config.sensitive,
+        },
+    }
+
+
+@router.put(
+    "/configs/{config_key}",
+    summary="更新配置",
+    description="更新配置值。",
+)
+def update_config(
+    config_key: str,
+    update_req: ConfigItemUpdate,
+    db: Session = Depends(get_db),
+):
+    """更新配置"""
+    service = SystemConfigService(db)
+
+    # 先检查配置是否存在
+    config = service.get_config_by_key(config_key)
+    if not config:
+        raise HTTPException(status_code=404, detail="配置不存在")
+
+    if not config.editable:
+        raise HTTPException(status_code=403, detail="该配置不可编辑")
+
+    updated = service.update_config(config_key, update_req.value)
+    if not updated:
+        raise HTTPException(status_code=400, detail="更新失败")
+
+    logger.info(f"Config updated: {config_key} = {update_req.value}")
+
+    return {
+        "success": True,
+        "message": "更新成功",
+        "data": {
+            "key": updated.key,
+            "value": updated.value if not updated.sensitive else ("*" * 8) if updated.value else "",
+            "raw_value": updated.value if not updated.sensitive else None,
+        },
+    }
+
+
+@router.post(
+    "/configs/batch",
+    summary="批量更新配置",
+    description="批量更新多个配置项。",
+)
+def batch_update_configs(
+    batch_req: ConfigBatchUpdate,
+    db: Session = Depends(get_db),
+):
+    """批量更新配置"""
+    service = SystemConfigService(db)
+    results = service.update_configs_batch(batch_req.configs)
+
+    success_count = sum(1 for v in results.values() if v)
+    logger.info(f"Batch updated {success_count}/{len(batch_req.configs)} configs")
+
+    return {
+        "success": True,
+        "message": f"成功更新 {success_count}/{len(batch_req.configs)} 项配置",
+        "data": results,
+    }
+
+
+@router.post(
+    "/configs/initialize",
+    summary="初始化默认配置",
+    description="初始化默认配置到数据库。",
+)
+def initialize_configs(db: Session = Depends(get_db)):
+    """初始化默认配置"""
+    service = SystemConfigService(db)
+    count = service.initialize_default_configs()
+
+    logger.info(f"Initialized {count} default configs")
+
+    return {
+        "success": True,
+        "message": f"成功初始化 {count} 项默认配置",
+        "data": {"count": count},
     }

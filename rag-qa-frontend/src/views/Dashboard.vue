@@ -75,23 +75,21 @@ import { ElMessage } from 'element-plus'
 import { Document, Collection, ChatDotRound, Clock, ChatLineSquare, Upload, Refresh } from '@element-plus/icons-vue'
 import { getSystemStats, rebuildKnowledgeBase as rebuildAPI } from '@/api'
 
-interface BackendStats {
-  documents: { total: number; processed: number; failed: number; processing: number }
-  chunks: { total: number }
-  vectors: { count: number; collection_name: string }
-  qa: { total_questions: number; cached_questions: number; cache_rate: number; avg_response_time_ms: number; today_queries: number }
-}
-const rawStats = ref<BackendStats | null>(null)
+const rawStats = ref<any>(null)
 
 const stats = computed(() => {
   if (!rawStats.value) return { total_queries: 0, today_queries: 0, total_documents: 0, total_chunks: 0, cache_hit_rate: 0, avg_response_time: 0 }
+  const qa = rawStats.value.qa || {}
+  const docs = rawStats.value.documents || {}
+  const chunks = rawStats.value.chunks || {}
+  const vectors = rawStats.value.vectors || {}
   return {
-    total_queries: rawStats.value.qa?.total_questions || 0,
-    today_queries: rawStats.value.qa?.today_queries || 0,
-    total_documents: rawStats.value.documents?.total || 0,
-    total_chunks: rawStats.value.chunks?.total || 0,
-    cache_hit_rate: rawStats.value.qa?.cache_rate || 0,
-    avg_response_time: rawStats.value.qa?.avg_response_time_ms || 0
+    total_queries: Number(qa.total_questions) || 0,
+    today_queries: Number(qa.today_queries) || 0,
+    total_documents: Number(docs.total) || 0,
+    total_chunks: Number(chunks.total || vectors.count) || 0,
+    cache_hit_rate: Number(qa.cache_rate) || 0,
+    avg_response_time: Number(qa.avg_response_time_ms) || 0
   }
 })
 
@@ -111,7 +109,12 @@ const getProgressColor = (value: number) => {
 const fetchStats = async () => {
   try {
     const res = await getSystemStats()
-    rawStats.value = res.data || res
+    // axios 拦截器返回 response.data = { success, message, code, data: {...} }
+    if (res && res.data) {
+      rawStats.value = res.data
+    } else if (res && res.qa) {
+      rawStats.value = res
+    }
   } catch (error) { console.error('Failed to fetch stats:', error) }
 }
 

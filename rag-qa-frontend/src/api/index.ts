@@ -123,3 +123,40 @@ export const getRuntimeConfig = () => {
   return request.get<ApiResponse<any>>('/system/config/runtime')
 }
 
+// ==================== 系统配置管理（数据库） ====================
+
+// 获取所有系统配置
+export const getConfigs = () => {
+  return request.get<ApiResponse<any[]>>('/system/configs')
+}
+
+// 获取配置分组
+export const getConfigGroups = () => {
+  return request.get<ApiResponse<any[]>>('/system/configs/groups')
+}
+
+// 获取分组后的配置
+export const getGroupedConfigs = () => {
+  return request.get<ApiResponse<any>>('/system/configs/grouped')
+}
+
+// 获取单个配置
+export const getConfig = (key: string) => {
+  return request.get<ApiResponse<any>>(`/system/configs/${key}`)
+}
+
+// 更新配置
+export const updateConfig = (key: string, value: string) => {
+  return request.put<ApiResponse<any>>(`/system/configs/${key}`, { value })
+}
+
+// 批量更新配置
+export const batchUpdateConfigs = (configs: Record<string, any>) => {
+  return request.post<ApiResponse<any>>('/system/configs/batch', { configs })
+}
+
+// 初始化默认配置
+export const initializeConfigs = () => {
+  return request.post<ApiResponse<{ count: number }>>('/system/configs/initialize')
+}
+

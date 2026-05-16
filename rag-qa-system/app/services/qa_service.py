@@ -60,6 +60,18 @@ class QAService:
         cached = self.cache.get_qa_cache(question)
         if cached:
             elapsed = (time.time() - start_time) * 1000
+            # 命中缓存也要记录到数据库
+            qa_log = QALog(
+                question=question,
+                answer=cached.get("answer", ""),
+                referenced_chunks=[s.get("vector_id") for s in cached.get("sources", []) if s.get("vector_id")],
+                response_time_ms=int(elapsed),
+                cache_hit=True,
+                session_id=session_id,
+            )
+            db.add(qa_log)
+            db.commit()
+            
             qa_logger.log_query(
                 question,
                 len(cached.get("answer", "")),
