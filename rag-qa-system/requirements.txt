@@ -9,7 +9,9 @@ pymysql==1.1.0
 aiomysql==0.2.0
 
 # Vector Database
-chromadb==1.5.9
+pymilvus==2.4.4
+setuptools==75.8.0
+marshmallow<3.13
 
 # Embedding Model
 sentence-transformers==2.7.0

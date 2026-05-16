@@ -53,7 +53,7 @@ class TestQAService:
     
     def test_search_result_parsing(self):
         """测试检索结果解析"""
-        # 模拟 ChromaDB 返回结果
+        # 模拟向量数据库返回结果
         mock_results = {
             "ids": [["1_0_abc123", "1_1_def456"]],
             "distances": [[0.15, 0.25]],
@@ -82,7 +82,7 @@ class TestQAService:
 | 批处理大小 | 默认配置 | 32 |
 | 块大小限制 | 200字符 | 每块≤200 |
 | 块重叠 | 20字符 | 块间有重叠 |
-| 检索结果解析 | ChromaDB格式 | 正确解析 |
+| 检索结果解析 | 向量数据库格式 | 正确解析 |
 """
 
 
@@ -167,9 +167,10 @@ GET /api/v1/system/health
     "status": "healthy",
     "mysql": true,
     "redis": true,
-    "chromadb": true,
+    "chromadb": false,
     "llm": true,
     "embedding": true,
+    "milvus": true,
     "version": "1.0.0"
 }
 ```

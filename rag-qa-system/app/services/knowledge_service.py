@@ -298,7 +298,8 @@ class KnowledgeService:
             metadatas = results.get("metadatas", [[]])[0]
             
             for i, (vector_id, distance, document, metadata) in enumerate(zip(ids, distances, documents, metadatas)):
-                similarity = 1 - distance if distance <= 1 else 1 / (1 + distance)
+                # Milvus IP 度量时，distance 即为相似度
+                similarity = distance
                 
                 chunks.append({
                     "vector_id": vector_id,

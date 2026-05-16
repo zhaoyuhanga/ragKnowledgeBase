@@ -100,7 +100,7 @@ class DocumentChunk(Base):
     # 字符数量
     char_count = Column(Integer, nullable=False, comment="字符数量")
     
-    # ChromaDB 中的向量ID
+    # 向量数据库中的向量ID
     vector_id = Column(String(64), nullable=True, index=True, comment="向量ID")
     
     # 创建时间

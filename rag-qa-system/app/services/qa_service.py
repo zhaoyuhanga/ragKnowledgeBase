@@ -188,7 +188,7 @@ class QAService:
         解析向量检索结果
 
         Args:
-            results: ChromaDB 检索结果
+            results: Milvus 检索结果
             db: 数据库会话
 
         Returns:
@@ -203,8 +203,8 @@ class QAService:
 
         for i, (vector_id, distance, document, metadata) in enumerate(zip(ids, distances, documents, metadatas)):
             # 计算相似度
-            # ChromaDB L2 距离范围是 [0, 2]，归一化后相似度 = 1 - distance/2
-            similarity = 1 - distance / 2
+            # Milvus IP 度量时，distance 即为相似度（归一化向量）
+            similarity = distance
             
             # 过滤低于阈值的检索结果
             if similarity < runtime_config.similarity_threshold:

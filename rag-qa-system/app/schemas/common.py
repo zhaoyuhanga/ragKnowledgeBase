@@ -89,9 +89,10 @@ class HealthCheckResponse(BaseModel):
     status: str = Field(description="服务状态: healthy/unhealthy/degraded")
     mysql: bool = Field(description="MySQL 连接状态")
     redis: bool = Field(description="Redis 连接状态")
-    chromadb: bool = Field(description="ChromaDB 连接状态")
+    chromadb: bool = Field(description="ChromaDB 连接状态（已废弃，保留兼容）")
     llm: bool = Field(description="LLM API 连接状态")
     embedding: bool = Field(description="Embedding 模型状态")
+    milvus: bool = Field(description="Milvus 连接状态")
     version: str = Field(default="1.0.0", description="服务版本")
     
     class Config:
@@ -100,9 +101,10 @@ class HealthCheckResponse(BaseModel):
                 "status": "healthy",
                 "mysql": True,
                 "redis": True,
-                "chromadb": True,
+                "chromadb": False,
                 "llm": True,
                 "embedding": True,
+                "milvus": True,
                 "version": "1.0.0"
             }
         }

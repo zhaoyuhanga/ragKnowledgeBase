@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"数据库初始化失败: {str(e)}")
     
-    # 预热向量存储（确保 ChromaDB 连接正常）
+    # 预热向量存储（确保 Milvus 连接正常）
     try:
         _ = vector_store.collection
         logger.info("向量数据库连接正常")
@@ -73,7 +73,7 @@ app = FastAPI(
 ### 核心功能
 
 - **文档管理**: 上传、解析、存储 PDF/Markdown/TXT/DOCX 文档
-- **知识库构建**: 文本切分、向量化、存储到 ChromaDB
+- **知识库构建**: 文本切分、向量化、存储到 Milvus
 - **智能问答**: 基于向量检索和 LLM 生成准确回答
 - **缓存管理**: Redis 缓存热点问答，降低 API 调用成本
 
@@ -81,7 +81,7 @@ app = FastAPI(
 
 - FastAPI: 高性能 Web 框架
 - MySQL 8.0: 元数据存储
-- ChromaDB: 向量数据库
+- Milvus: 向量数据库
 - Redis: 缓存层
 - DeepSeek API: 大语言模型
 - sentence-transformers: 本地 Embedding

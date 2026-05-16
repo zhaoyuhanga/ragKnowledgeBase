@@ -148,8 +148,8 @@ class FileParser:
             logger.error(f"TXT 解析失败: {str(e)}")
             raise
     
-    @staticmethod
-    def parse_docx(file_path: str) -> Tuple[str, int]:
+    @classmethod
+    def parse_docx(cls, file_path: str) -> Tuple[str, int]:
         """
         解析 DOCX 文件
         
@@ -162,12 +162,20 @@ class FileParser:
         logger.info(f"正在解析 DOCX 文件: {file_path}")
         
         try:
+            from zipfile import BadZipFile
             doc = docx.Document(file_path)
             
             texts = []
             for para in doc.paragraphs:
                 if para.text.strip():
                     texts.append(para.text.strip())
+            
+            # 尝试提取表格内容
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            texts.append(cell.text.strip())
             
             content = "\n\n".join(texts)
             para_count = len(texts)
@@ -176,8 +184,44 @@ class FileParser:
             
             return content, para_count
             
+        except BadZipFile:
+            # 处理损坏的 DOCX 文件
+            logger.warning(f"DOCX 文件格式异常，尝试使用备用方法: {file_path}")
+            return cls._parse_docx_fallback(file_path)
         except Exception as e:
+            if "NULL" in str(e) or "archive" in str(e).lower():
+                # 处理嵌入对象导致的错误
+                logger.warning(f"DOCX 包含嵌入对象，使用备用解析方法: {str(e)}")
+                return cls._parse_docx_fallback(file_path)
             logger.error(f"DOCX 解析失败: {str(e)}")
+            raise
+    
+    @classmethod
+    def _parse_docx_fallback(cls, file_path: str) -> Tuple[str, int]:
+        """备用 DOCX 解析方法，使用纯 ZIP 方式提取文本"""
+        try:
+            import zipfile
+            import xml.etree.ElementTree as ET
+            
+            texts = []
+            with zipfile.ZipFile(file_path, 'r') as zf:
+                for name in zf.namelist():
+                    if name.startswith('word/document'):
+                        with zf.open(name) as xml_file:
+                            tree = ET.parse(xml_file)
+                            root = tree.getroot()
+                            ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                            for elem in root.iter():
+                                if elem.tag.endswith('}t') and elem.text:
+                                    texts.append(elem.text)
+            
+            content = "\n\n".join(texts)
+            para_count = len([t for t in texts if t.strip()])
+            logger.info(f"DOCX 备用解析完成，段落数: {para_count}, 字符数: {len(content)}")
+            return content, para_count
+            
+        except Exception as e:
+            logger.error(f"DOCX 备用解析失败: {str(e)}")
             raise
     
     @classmethod

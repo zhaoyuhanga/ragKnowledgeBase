@@ -61,10 +61,15 @@ class Settings(BaseSettings):
     deepseek_timeout: int = Field(default=60, description="API 请求超时时间（秒）")
     deepseek_max_retries: int = Field(default=3, description="最大重试次数")
     
-    # ============ ChromaDB 向量数据库配置 ============
-    chroma_persist_dir: str = Field(default="./data/chroma", description="ChromaDB 持久化目录")
-    chroma_collection_name: str = Field(default="knowledge_base", description="Collection 名称")
-    chroma_auto_create_collection: bool = Field(default=True, description="自动创建 Collection")
+    # ============ Milvus 向量数据库配置 ============
+    milvus_host: str = Field(default="localhost", description="Milvus 主机")
+    milvus_port: int = Field(default=19530, description="Milvus 端口")
+    milvus_user: str = Field(default="", description="Milvus 用户名")
+    milvus_password: str = Field(default="", description="Milvus 密码")
+    milvus_collection_name: str = Field(default="knowledge_base", description="Collection 名称")
+    milvus_index_type: str = Field(default="IVF_FLAT", description="索引类型")
+    milvus_metric_type: str = Field(default="IP", description="度量类型 (L2/IP/COSINE)")
+    milvus_nlist: int = Field(default=1024, description="nlist 参数")
     
     # ============ Embedding 模型配置 ============
     embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", description="Embedding 模型名称")
@@ -134,7 +139,6 @@ class Settings(BaseSettings):
         """确保必要的目录存在"""
         dirs = [
             self.upload_dir,
-            self.chroma_persist_dir,
             os.path.dirname(self.log_file_path) if self.log_file_path else None,
         ]
         for dir_path in dirs:

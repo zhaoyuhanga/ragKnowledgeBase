@@ -36,7 +36,7 @@ class ConfigUpdateRequest(BaseModel):
     "/health",
     response_model=HealthCheckResponse,
     summary="健康检查",
-    description="检查系统各组件的运行状态，包括 MySQL、Redis、ChromaDB、LLM 和 Embedding 模型。",
+    description="检查系统各组件的运行状态，包括 MySQL、Redis、Milvus、LLM 和 Embedding 模型。",
 )
 def health_check(
     db: Session = Depends(get_db),
@@ -51,7 +51,7 @@ def health_check(
     - `status`: 服务整体状态（healthy/unhealthy/degraded）
     - `mysql`: MySQL 连接状态
     - `redis`: Redis 连接状态
-    - `chromadb`: ChromaDB 连接状态
+    - `milvus`: Milvus 连接状态
     - `llm`: LLM API 连接状态
     - `embedding`: Embedding 模型状态
     - `version`: 服务版本
@@ -62,7 +62,7 @@ def health_check(
         "status": "healthy",
         "mysql": true,
         "redis": true,
-        "chromadb": true,
+        "milvus": true,
         "llm": true,
         "embedding": true,
         "version": "1.0.0"
@@ -72,15 +72,15 @@ def health_check(
     # 检查各组件状态
     mysql_ok = check_db_connection()
     redis_ok = redis_cache.check_health()
-    chromadb_ok = vector_store.check_health()
+    milvus_ok = vector_store.check_health()
     llm_ok = llm_client.check_connection()
     embedding_ok = embedding_service.check_health()
     
     # 计算整体状态
-    critical_services = [mysql_ok, chromadb_ok, embedding_ok]
+    critical_services = [mysql_ok, milvus_ok, embedding_ok]
     healthy_count = sum(critical_services)
     
-    if all([mysql_ok, chromadb_ok, embedding_ok]):
+    if all([mysql_ok, milvus_ok, embedding_ok]):
         status = "healthy"
     elif healthy_count >= 2:
         status = "degraded"
@@ -90,7 +90,7 @@ def health_check(
     system_logger.log_operation("health_check", status, details={
         "mysql": mysql_ok,
         "redis": redis_ok,
-        "chromadb": chromadb_ok,
+        "milvus": milvus_ok,
         "llm": llm_ok,
         "embedding": embedding_ok,
     })
@@ -99,7 +99,8 @@ def health_check(
         status=status,
         mysql=mysql_ok,
         redis=redis_ok,
-        chromadb=chromadb_ok,
+        chromadb=False,  # 已废弃，保留兼容
+        milvus=milvus_ok,
         llm=llm_ok,
         embedding=embedding_ok,
         version="1.0.0",
@@ -166,8 +167,9 @@ def get_config():
         "redis_port": settings.redis_port,
         "deepseek_base_url": settings.deepseek_base_url,
         "deepseek_model": settings.deepseek_model,
-        "chroma_persist_dir": settings.chroma_persist_dir,
-        "chroma_collection_name": settings.chroma_collection_name,
+        "milvus_host": settings.milvus_host,
+        "milvus_port": settings.milvus_port,
+        "milvus_collection_name": settings.milvus_collection_name,
         "embedding_model": settings.embedding_model,
         "embedding_device": settings.embedding_device,
         "chunk_size": settings.chunk_size,
