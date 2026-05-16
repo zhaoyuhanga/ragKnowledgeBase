@@ -8,7 +8,6 @@ import type {
   QAHistory,
   KnowledgeStats,
   SystemStats,
-  SystemConfig,
   UploadResponse
 } from '@/types'
 
@@ -102,25 +101,11 @@ export const getSystemStats = () => {
   return request.get<ApiResponse<SystemStats>>('/system/stats')
 }
 
-// 获取系统配置
-export const getSystemConfig = () => {
-  return request.get<ApiResponse<SystemConfig>>('/system/config')
-}
-
-// 更新系统运行时配置
-export const updateSystemConfig = (config: {
-  retrieval_top_k?: number
-  similarity_threshold?: number
-  deepseek_model?: string
-  chunk_size?: number
-  chunk_overlap?: number
-}) => {
-  return request.post<ApiResponse<any>>('/system/config', config)
-}
+// ==================== 系统运行时配置 ====================
 
 // 获取运行时配置
 export const getRuntimeConfig = () => {
-  return request.get<ApiResponse<any>>('/system/config/runtime')
+  return request.get<ApiResponse<any>>('/system/config')
 }
 
 // ==================== 系统配置管理（数据库） ====================
@@ -135,24 +120,9 @@ export const getConfigGroups = () => {
   return request.get<ApiResponse<any[]>>('/system/configs/groups')
 }
 
-// 获取分组后的配置
-export const getGroupedConfigs = () => {
-  return request.get<ApiResponse<any>>('/system/configs/grouped')
-}
-
-// 获取单个配置
-export const getConfig = (key: string) => {
-  return request.get<ApiResponse<any>>(`/system/configs/${key}`)
-}
-
 // 更新配置
 export const updateConfig = (key: string, value: string) => {
   return request.put<ApiResponse<any>>(`/system/configs/${key}`, { value })
-}
-
-// 批量更新配置
-export const batchUpdateConfigs = (configs: Record<string, any>) => {
-  return request.post<ApiResponse<any>>('/system/configs/batch', { configs })
 }
 
 // 初始化默认配置

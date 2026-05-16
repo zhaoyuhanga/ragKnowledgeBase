@@ -162,7 +162,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ChatLineSquare, Refresh, Loading, Setting } from '@element-plus/icons-vue'
 import { healthCheck, getConfigs, getConfigGroups, updateConfig, initializeConfigs as initConfigsAPI } from '@/api'
@@ -200,8 +200,7 @@ const configs = ref<ConfigItem[]>([])
 const techStack = ['FastAPI', 'Milvus', 'Redis', 'MySQL', 'Vue 3', 'Element Plus']
 
 const envDisplay = computed(() => {
-  const env = configs.value.find(c => c.key === 'APP_ENV')
-  return env?._displayValue === 'production' ? '生产环境' : '开发环境'
+  return '开发环境'
 })
 
 const getGroupConfigs = (group: string) => {
@@ -220,28 +219,26 @@ const getTypeTagType = (type: string) => {
 
 const getNumberMin = (key: string) => {
   const mins: Record<string, number> = {
-    APP_PORT: 1,
-    MYSQL_PORT: 1,
-    REDIS_PORT: 1,
-    MILVUS_PORT: 1,
     RETRIEVAL_TOP_K: 1,
     SIMILARITY_THRESHOLD: 0,
     MMR_DIVERSITY: 0,
-    CACHE_DEFAULT_TTL: 60,
-    MAX_FILE_SIZE: 1024,
+    CHUNK_SIZE: 50,
+    CHUNK_OVERLAP: 0,
+    CHUNK_MIN_SIZE: 1,
+    ACCESS_TOKEN_EXPIRE_MINUTES: 1,
   }
   return mins[key] ?? 0
 }
 
 const getNumberMax = (key: string) => {
   const maxs: Record<string, number> = {
-    APP_PORT: 65535,
-    MYSQL_PORT: 65535,
-    REDIS_PORT: 65535,
-    MILVUS_PORT: 65535,
     RETRIEVAL_TOP_K: 50,
     SIMILARITY_THRESHOLD: 1,
     MMR_DIVERSITY: 1,
+    CHUNK_SIZE: 5000,
+    CHUNK_OVERLAP: 1000,
+    CHUNK_MIN_SIZE: 1000,
+    ACCESS_TOKEN_EXPIRE_MINUTES: 10080,
   }
   return maxs[key] ?? 999999
 }
@@ -250,7 +247,10 @@ const getNumberStep = (key: string) => {
   const steps: Record<string, number> = {
     SIMILARITY_THRESHOLD: 0.05,
     MMR_DIVERSITY: 0.1,
-    CACHE_DEFAULT_TTL: 60,
+    CHUNK_SIZE: 50,
+    CHUNK_OVERLAP: 10,
+    CHUNK_MIN_SIZE: 10,
+    ACCESS_TOKEN_EXPIRE_MINUTES: 5,
   }
   return steps[key] ?? 1
 }

@@ -92,14 +92,12 @@ class LLMClient:
         try:
             messages = []
 
-            # 添加系统提示
             if system_prompt:
                 messages.append({
                     "role": "system",
                     "content": system_prompt
                 })
 
-            # 添加用户输入
             messages.append({
                 "role": "user",
                 "content": prompt
@@ -118,7 +116,6 @@ class LLMClient:
             elapsed = (time.time() - start_time) * 1000
             logger.info(f"DeepSeek API 调用完成，耗时: {elapsed:.2f}ms")
 
-            # 提取回答内容
             if response.choices and len(response.choices) > 0:
                 return response.choices[0].message.content.strip()
             else:
@@ -152,13 +149,11 @@ class LLMClient:
         Returns:
             生成的文本回答
         """
-        # 构建上下文提示
         context_text = "\n\n".join([
             f"[文档 {i+1}]:\n{doc}"
             for i, doc in enumerate(context)
         ])
 
-        # 构建完整 prompt
         prompt = f"""基于以下参考文档回答用户问题。如果参考文档中没有相关信息，请如实说明。
 
 【参考文档】
@@ -169,7 +164,6 @@ class LLMClient:
 
 请根据参考文档回答问题，回答时提及参考文档编号。"""
 
-        # 使用默认系统提示或自定义
         default_system = "你是一个专业的知识库问答助手，请基于提供的参考文档准确回答用户问题。如果文档中没有相关信息，请明确告知用户。"
 
         if history and len(history) > 0:
@@ -194,17 +188,11 @@ class LLMClient:
         )
 
     def check_connection(self) -> bool:
-        """
-        检查 API 连接是否正常
-
-        Returns:
-            连接是否正常
-        """
+        """检查 API 连接是否正常"""
         if not self.is_available:
             return False
 
         try:
-            # 发送一个简单的测试请求
             response = self._client.chat.completions.create(
                 model=settings.deepseek_model,
                 messages=[{"role": "user", "content": "你好"}],

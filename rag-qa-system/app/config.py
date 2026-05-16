@@ -26,8 +26,6 @@ class Settings(BaseSettings):
     secret_key: str = Field(default="your-secret-key-change-in-production", description="密钥")
     algorithm: str = Field(default="HS256", description="JWT 算法")
     access_token_expire_minutes: int = Field(default=30, description="访问令牌过期时间（分钟）")
-    
-    # ============ MySQL 数据库配置 ============
     mysql_host: str = Field(default="localhost", description="MySQL 主机")
     mysql_port: int = Field(default=3306, description="MySQL 端口")
     mysql_database: str = Field(default="rag_qa", description="MySQL 数据库名")
@@ -76,17 +74,6 @@ class Settings(BaseSettings):
     embedding_device: str = Field(default="cpu", description="运行设备: cpu | cuda | mps")
     embedding_dimension: int = Field(default=384, description="向量维度")
     embedding_batch_size: int = Field(default=32, description="批量处理大小")
-    
-    # ============ 文本切分配置 ============
-    chunk_size: int = Field(default=500, description="文本块最大字符数")
-    chunk_overlap: int = Field(default=50, description="文本块重叠字符数")
-    chunk_min_size: int = Field(default=50, description="最小块字符数")
-    
-    # ============ 向量检索配置 ============
-    retrieval_top_k: int = Field(default=5, description="检索返回数量")
-    similarity_threshold: float = Field(default=0.2, description="相似度阈值")
-    enable_mmr: bool = Field(default=False, description="启用 MMR")
-    mmr_diversity: float = Field(default=0.5, description="MMR diversity 参数")
     
     # ============ 文件上传配置 ============
     upload_dir: str = Field(default="./data/documents", description="文档存储目录")

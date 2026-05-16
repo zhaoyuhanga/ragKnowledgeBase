@@ -22,10 +22,7 @@ logger = get_logger(__name__)
 
 
 class QAService:
-    """
-    问答服务
-    处理用户问答请求，包括检索、生成和缓存
-    """
+    """问答服务"""
 
     def __init__(self):
         self.embedding_service = get_embedding_service()
@@ -41,26 +38,13 @@ class QAService:
         top_k: int = None,
         temperature: float = 0.3
     ) -> Dict[str, Any]:
-        """
-        处理问答请求
-
-        Args:
-            question: 用户问题
-            db: 数据库会话
-            session_id: 会话 ID（用于多轮对话）
-            top_k: 检索的文档数量
-            temperature: 生成温度参数
-
-        Returns:
-            包含回答、来源等信息的字典
-        """
+        """处理问答请求"""
         start_time = time.time()
 
         # 检查缓存
         cached = self.cache.get_qa_cache(question)
         if cached:
             elapsed = (time.time() - start_time) * 1000
-            # 命中缓存也要记录到数据库
             qa_log = QALog(
                 question=question,
                 answer=cached.get("answer", ""),
@@ -71,7 +55,7 @@ class QAService:
             )
             db.add(qa_log)
             db.commit()
-            
+
             qa_logger.log_query(
                 question,
                 len(cached.get("answer", "")),
@@ -88,11 +72,9 @@ class QAService:
             }
 
         try:
-            # 1. 向量化问题
             logger.info(f"正在处理问题: {question[:50]}...")
             query_embedding = self.embedding_service.encode_single(question)
 
-            # 2. 检索相关文档（使用运行时配置）
             k = top_k or runtime_config.retrieval_top_k
             search_results = self.vector_store.search_vectors(
                 query_embedding=query_embedding,
@@ -100,7 +82,6 @@ class QAService:
                 where=None
             )
 
-            # 3. 提取检索结果
             retrieved_chunks = self._parse_search_results(search_results, db)
 
             if not retrieved_chunks:
@@ -112,10 +93,8 @@ class QAService:
                     "response_time_ms": int(elapsed),
                 }
 
-            # 4. 生成回答
             context_texts = [chunk["content"] for chunk in retrieved_chunks]
 
-            # Build conversation history for multi-turn dialogue
             conversation_history = []
             if session_id:
                 history_logs, _ = self.get_qa_history(db, session_id=session_id, limit=5)
@@ -133,7 +112,6 @@ class QAService:
                 temperature=temperature
             )
 
-            # 5. 记录日志
             elapsed = (time.time() - start_time) * 1000
             qa_logger.log_query(
                 question,
@@ -144,7 +122,6 @@ class QAService:
                 elapsed
             )
 
-            # 6. 保存问答日志
             qa_log = QALog(
                 question=question,
                 answer=answer,
@@ -156,7 +133,6 @@ class QAService:
             db.add(qa_log)
             db.commit()
 
-            # 7. 缓存结果
             sources = [
                 {
                     "chunk_id": chunk.get("chunk_id"),
@@ -196,16 +172,7 @@ class QAService:
         results: Dict[str, Any],
         db: Session
     ) -> List[Dict[str, Any]]:
-        """
-        解析向量检索结果
-
-        Args:
-            results: Milvus 检索结果
-            db: 数据库会话
-
-        Returns:
-            包含文档块详情的列表
-        """
+        """解析向量检索结果"""
         chunks = []
 
         ids = results.get("ids", [[]])[0]
@@ -214,14 +181,11 @@ class QAService:
         metadatas = results.get("metadatas", [[]])[0]
 
         for i, (vector_id, distance, document, metadata) in enumerate(zip(ids, distances, documents, metadatas)):
-            # 计算相似度
-            # Milvus IP 度量时，distance 即为相似度（归一化向量）
             similarity = distance
-            
-            # 过滤低于阈值的检索结果
+
             if similarity < runtime_config.similarity_threshold:
                 continue
-            
+
             chunks.append({
                 "vector_id": vector_id,
                 "document_id": metadata.get("document_id"),
@@ -242,18 +206,7 @@ class QAService:
         skip: int = 0,
         limit: int = 20
     ) -> Tuple[List[QALog], int]:
-        """
-        获取问答历史
-
-        Args:
-            db: 数据库会话
-            session_id: 会话 ID（可选）
-            skip: 跳过的记录数
-            limit: 返回的记录数
-
-        Returns:
-            (问答记录列表, 总数)
-        """
+        """获取问答历史"""
         query = db.query(QALog)
 
         if session_id:
@@ -265,12 +218,7 @@ class QAService:
         return logs, total
 
     def clear_cache(self) -> int:
-        """
-        清空问答缓存
-
-        Returns:
-            删除的缓存数量
-        """
+        """清空问答缓存"""
         count = self.cache.clear_pattern("qa:*")
         logger.info(f"已清空 {count} 条问答缓存")
         return count

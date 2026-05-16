@@ -7,6 +7,7 @@ from typing import List, Tuple, Optional
 import re
 
 from app.config import settings
+from app.core.runtime_config import runtime_config
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,9 +35,9 @@ class TextSplitter:
             min_chunk_size: 最小块字符数
             separator: 分隔符
         """
-        self.chunk_size = chunk_size or settings.chunk_size
-        self.chunk_overlap = chunk_overlap or settings.chunk_overlap
-        self.min_chunk_size = min_chunk_size or settings.chunk_min_size
+        self.chunk_size = chunk_size or runtime_config.chunk_size
+        self.chunk_overlap = chunk_overlap or runtime_config.chunk_overlap
+        self.min_chunk_size = min_chunk_size or runtime_config.chunk_min_size
         self.separator = separator
         
         # 验证参数

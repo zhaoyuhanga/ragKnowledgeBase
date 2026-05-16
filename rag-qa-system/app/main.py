@@ -11,10 +11,9 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.api.v1 import api_router
-from app.core.database import init_db, check_db_connection
-from app.core.logger import get_logger, app_logger
-from app.core.vectorstore import vector_store
-from app.core.cache import redis_cache
+from app.core.database import init_db, check_db_connection, SessionLocal
+from app.core.logger import get_logger
+from app.core.runtime_config import runtime_config
 
 logger = get_logger(__name__)
 
@@ -36,19 +35,17 @@ async def lifespan(app: FastAPI):
         logger.info("数据库初始化完成")
     except Exception as e:
         logger.error(f"数据库初始化失败: {str(e)}")
-    
-    # 预热向量存储（确保 Milvus 连接正常）
+
+    # 从数据库加载运行时配置（仅包含运行时可调参数）
     try:
-        _ = vector_store.collection
-        logger.info("向量数据库连接正常")
+        db = SessionLocal()
+        try:
+            runtime_config.load_from_db(db)
+            logger.info("运行时配置加载完成")
+        finally:
+            db.close()
     except Exception as e:
-        logger.warning(f"向量数据库连接异常: {str(e)}")
-    
-    # 检查 Redis 连接
-    if redis_cache.is_available:
-        logger.info("Redis 缓存连接正常")
-    else:
-        logger.warning("Redis 缓存不可用，将禁用缓存功能")
+        logger.warning(f"运行时配置加载失败: {str(e)}")
     
     logger.info("=" * 50)
     logger.info("RAG 问答系统启动完成")
