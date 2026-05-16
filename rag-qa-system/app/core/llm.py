@@ -187,6 +187,131 @@ class LLMClient:
             max_tokens=max_tokens
         )
 
+    def generate_stream(
+        self,
+        prompt: str,
+        system_prompt: str = None,
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+        **kwargs
+    ):
+        """
+        流式生成文本回答
+
+        Args:
+            prompt: 用户输入提示
+            system_prompt: 系统提示（可选）
+            temperature: 温度参数
+            max_tokens: 最大生成 token 数
+            **kwargs: 其他 OpenAI 参数
+
+        Yields:
+            每个 token 的增量文本
+        """
+        if not self.is_available:
+            raise RuntimeError("LLM 客户端未初始化或 API Key 未配置")
+
+        try:
+            messages = []
+
+            if system_prompt:
+                messages.append({
+                    "role": "system",
+                    "content": system_prompt
+                })
+
+            messages.append({
+                "role": "user",
+                "content": prompt
+            })
+
+            logger.debug(f"正在调用 DeepSeek API（流式），模型: {settings.deepseek_model}")
+
+            stream = self._client.chat.completions.create(
+                model=settings.deepseek_model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+                **kwargs
+            )
+
+            for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        yield delta
+
+        except Exception as e:
+            logger.error(f"DeepSeek API 流式调用失败: {str(e)}")
+            raise
+
+    def generate_with_context_stream(
+        self,
+        question: str,
+        context: List[str],
+        history: List[dict] = None,
+        system_prompt: str = None,
+        temperature: float = 0.3,
+        max_tokens: int = 2000
+    ):
+        """
+        基于上下文流式生成回答
+
+        Args:
+            question: 用户问题
+            context: 检索到的上下文文档列表
+            history: 对话历史
+            system_prompt: 系统提示
+            temperature: 温度参数
+            max_tokens: 最大 token 数
+
+        Yields:
+            每个 token 的增量文本
+        """
+        context_text = "\n\n".join([
+            f"[文档 {i+1}]:\n{doc}"
+            for i, doc in enumerate(context)
+        ])
+
+        prompt = f"""基于以下参考文档回答用户问题。如果参考文档中没有相关信息，请如实说明。
+
+【参考文档】
+{context_text}
+
+【用户问题】
+{question}
+
+请根据参考文档回答问题，回答时提及参考文档编号。"""
+
+        default_system = "你是一个专业的知识库问答助手，请基于提供的参考文档准确回答用户问题。如果文档中没有相关信息，请明确告知用户。"
+
+        if history and len(history) > 0:
+            messages = []
+            messages.append({"role": "system", "content": system_prompt or default_system})
+            messages.extend(history)
+            messages.append({"role": "user", "content": prompt})
+
+            stream = self._client.chat.completions.create(
+                model=settings.deepseek_model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                stream=True,
+            )
+            for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        yield delta
+        else:
+            yield from self.generate_stream(
+                prompt=prompt,
+                system_prompt=system_prompt or default_system,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+
     def check_connection(self) -> bool:
         """检查 API 连接是否正常"""
         if not self.is_available:

@@ -6,11 +6,11 @@ RAG 问答系统 - 问答 API 模块
 import math
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
 from app.services.qa_service import qa_service
-from app.services.document_service import document_service
 from app.schemas.qa import (
     QAAskRequest,
     QAAskResponse,
@@ -19,7 +19,6 @@ from app.schemas.qa import (
 )
 from app.schemas.common import DataResponse
 from app.core.logger import get_logger, qa_logger
-from app.config import settings
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/qa", tags=["问答"])
@@ -80,7 +79,7 @@ async def ask_question(
         top_k=request.top_k,
         temperature=request.temperature,
     )
-    
+
     return DataResponse(
         success=True,
         message="问答处理完成",
@@ -91,6 +90,52 @@ async def ask_question(
             response_time_ms=result["response_time_ms"],
             error=result.get("error"),
         )
+    )
+
+
+@router.post(
+    "/ask/stream",
+    summary="流式问答",
+    description="流式返回回答，边生成边推送，用户感知延迟更低。",
+)
+async def ask_question_stream(
+    request: QAAskRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    流式问答接口
+
+    使用 Server-Sent Events（SSE）协议，流式返回 LLM 生成的回答。
+
+    **事件格式：**
+    - `sources`: 检索到的参考来源（仅首次）
+    - `token`: 每个 token 增量文本
+    - `done`: 完成，附带完整结果
+    - `error`: 错误信息
+
+    **前端处理示例：**
+    ```javascript
+    const eventSource = new EventSource('/api/v1/qa/ask/stream', {
+      method: 'POST',
+      body: JSON.stringify({ question: '...' }),
+      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }
+    })
+    ```
+    """
+    return StreamingResponse(
+        qa_service.ask_stream(
+            question=request.question,
+            db=db,
+            session_id=request.session_id,
+            top_k=request.top_k,
+            temperature=request.temperature,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
