@@ -11,15 +11,16 @@ class TestSettings:
     """配置测试类"""
     
     def test_default_values(self):
-        """测试默认值配置"""
+        """测试配置加载"""
         settings = Settings()
-        
+
         assert settings.app_env == "development"
-        assert settings.app_port == 8000
+        assert settings.app_port == 8088
         assert settings.debug == True
-        assert settings.chunk_size == 500
-        assert settings.chunk_overlap == 50
-        assert settings.retrieval_top_k == 5
+        assert settings.mysql_host == "localhost"
+        assert settings.redis_host == "localhost"
+        assert settings.embedding_provider == "ollama"
+        assert settings.reranker_enabled == False
     
     def test_mysql_url(self):
         """测试 MySQL URL 生成"""
@@ -55,21 +56,5 @@ class TestSettings:
     def test_redis_key_prefix(self):
         """测试 Redis 键前缀"""
         settings = Settings()
-        
+
         assert settings.redis_key_prefix.endswith(":")
-
-
-# 测试用例配置
-# ============================================================
-# 测试数据
-# ============================================================
-"""
-测试数据配置
-
-| 测试项 | 输入数据 | 预期结果 |
-|--------|----------|----------|
-| 默认配置 | 无 | app_port=8000 |
-| MySQL URL | mysql_user=root, mysql_host=localhost | 包含 root@localhost |
-| 扩展名列表 | "pdf,md,txt" | ["pdf", "md", "txt"] |
-"""
-"""

@@ -266,7 +266,6 @@ def test_get_config_endpoint(client):
     data = response.json()['data']
     assert 'deepseek_api_key' not in data
     assert 'mysql_password' not in data
-    assert 'deepseek_model' in data
-    assert 'embedding_model' in data
     assert 'chunk_size' in data
+    assert 'retrieval_top_k' in data
 

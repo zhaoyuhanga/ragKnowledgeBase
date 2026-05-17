@@ -96,61 +96,82 @@ class DocumentChunk(Base):
     存储文档切分后的文本块
     """
     __tablename__ = "document_chunks"
-    
+
     # 主键，自增ID
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    
+
     # 外键，关联文档表
     document_id = Column(
-        BigInteger, 
-        ForeignKey("documents.id", ondelete="CASCADE"), 
+        BigInteger,
+        ForeignKey("documents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="文档ID"
     )
-    
+
     # 块序号
     chunk_index = Column(Integer, nullable=False, comment="块序号")
-    
+
     # 文本内容
     content = Column(Text, nullable=False, comment="文本内容")
-    
+
     # 字符数量
     char_count = Column(Integer, nullable=False, comment="字符数量")
-    
+
+    # token 数量
+    token_count = Column(Integer, nullable=True, comment="token数量")
+
+    # 内容哈希
+    content_hash = Column(String(64), nullable=True, comment="内容哈希")
+
+    # 标题路径（用于 LLM 引用）
+    title_path = Column(String(512), nullable=True, comment="标题路径")
+
+    # 章节层级
+    section_level = Column(Integer, nullable=True, comment="章节层级")
+
+    # 块类型：title/paragraph/list/table/code/mixed
+    block_type = Column(String(20), nullable=True, comment="块类型")
+
+    # parent section ID（用于 parent-child retrieval）
+    parent_section_id = Column(String(64), nullable=True, comment="父章节ID")
+
+    # chunk 版本号
+    chunk_version = Column(String(20), nullable=True, comment="chunk版本号")
+
     # 向量数据库中的向量ID
     vector_id = Column(String(64), nullable=True, index=True, comment="向量ID")
-    
+
     # 创建时间
     created_at = Column(DateTime, default=datetime.now, nullable=False, comment="创建时间")
-    
+
     # ============ AI 生成相关字段 ============
     # 来源类型: local(本地导入) | ai_generated(AI生成)
     source_type = Column(String(20), default="local", nullable=False, comment="来源类型")
-    
+
     # AI 生成时记录原始问题
     generated_from_question = Column(Text, nullable=True, comment="AI生成时的原始问题")
-    
+
     # AI 生成时间
     generated_at = Column(DateTime, nullable=True, comment="AI生成时间")
-    
+
     # 使用的LLM模型
     llm_model = Column(String(100), nullable=True, comment="LLM模型")
-    
+
     # LLM提供商
     llm_provider = Column(String(50), nullable=True, comment="LLM提供商")
-    
+
     # 关联的文档
     document: Mapped["Document"] = relationship("Document", back_populates="chunks")
-    
+
     # 索引
     __table_args__ = (
         Index("idx_chunk_document_index", "document_id", "chunk_index"),
         Index("idx_chunk_source_type", "source_type"),
     )
-    
+
     def __repr__(self):
-        return f"<DocumentChunk(id={self.id}, document_id={self.document_id}, source_type='{self.source_type}')>"
+        return f"<DocumentChunk(id={self.id}, document_id={self.document_id}, block_type='{self.block_type}')>"
 
 
 class QALog(Base):

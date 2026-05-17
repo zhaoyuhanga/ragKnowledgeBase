@@ -1,4 +1,4 @@
-// API ????
+// API 响应
 export interface ApiResponse<T = any> {
   success: boolean
   message: string
@@ -6,7 +6,7 @@ export interface ApiResponse<T = any> {
   data: T
 }
 
-// ????
+// 文档
 export interface Document {
   id: number
   filename: string
@@ -16,7 +16,7 @@ export interface Document {
   chunk_count: number
   created_at: string
   updated_at: string
-  // AI ??????
+  // AI 生成文档
   source_type?: 'local' | 'ai_generated'
   generated_from_question?: string
   generated_at?: string
@@ -24,7 +24,7 @@ export interface Document {
   llm_provider?: string
 }
 
-// ??????
+// 文档列表响应
 export interface DocumentListResponse {
   items: Document[]
   total: number
@@ -32,7 +32,7 @@ export interface DocumentListResponse {
   page_size: number
 }
 
-// ????
+// 问答请求
 export interface QARequest {
   question: string
   top_k?: number
@@ -40,7 +40,7 @@ export interface QARequest {
   enable_ai_extend?: boolean
 }
 
-// ????
+// 问答响应
 export interface QAResponse {
   answer: string
   sources: SourceItem[]
@@ -51,7 +51,7 @@ export interface QAResponse {
   ai_doc_id?: number
 }
 
-// ???
+// 来源
 export interface SourceItem {
   chunk_id: number
   document_id: number
@@ -59,9 +59,15 @@ export interface SourceItem {
   content: string
   similarity: number
   source_type?: 'local' | 'ai_generated'
+  // 新增字段 - SemanticChunker
+  title_path?: string
+  page_no?: number | null
+  block_type?: string
+  token_count?: number
+  chunk_version?: string
 }
 
-// ????
+// 问答历史
 export interface QAHistory {
   id: number
   question: string
@@ -74,7 +80,7 @@ export interface QAHistory {
   created_at: string
 }
 
-// ?????
+// 知识库统计
 export interface KnowledgeStats {
   total_documents: number
   total_chunks: number
@@ -82,7 +88,7 @@ export interface KnowledgeStats {
   last_updated: string
 }
 
-// ????
+// 系统统计
 export interface SystemStats {
   total_queries: number
   today_queries: number
@@ -92,7 +98,7 @@ export interface SystemStats {
   avg_response_time: number
 }
 
-// ????
+// 系统配置
 export interface SystemConfig {
   deepseek_model: string
   embedding_model: string
@@ -103,7 +109,7 @@ export interface SystemConfig {
   max_tokens: number
 }
 
-// ????
+// 上传响应
 export interface UploadResponse {
   id: number
   filename: string

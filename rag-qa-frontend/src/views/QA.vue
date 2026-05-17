@@ -63,10 +63,21 @@
       <div class="sources-section" v-if="currentAnswer.sources && currentAnswer.sources.length > 0">
         <h4><el-icon><Link /></el-icon> 参考来源</h4>
         <div class="sources-list">
-          <el-tag v-for="(source, index) in currentAnswer.sources" :key="index" class="source-tag" :type="source.source_type === 'ai_generated' ? 'warning' : 'info'">
-            <el-icon v-if="source.source_type === 'ai_generated'"><MagicStick /></el-icon>
-            {{ source.filename }} (相似度: {{ (source.similarity * 100).toFixed(1) }}%)
-          </el-tag>
+          <div v-for="(source, index) in currentAnswer.sources" :key="index" class="source-item">
+            <el-tag class="source-tag" :type="source.source_type === 'ai_generated' ? 'warning' : 'info'">
+              <el-icon v-if="source.source_type === 'ai_generated'"><MagicStick /></el-icon>
+              {{ source.filename }}
+            </el-tag>
+            <el-tag v-if="source.block_type" size="small" type="success">{{ getBlockTypeText(source.block_type) }}</el-tag>
+            <el-tag v-if="source.page_no" size="small" type="info">页码: {{ source.page_no }}</el-tag>
+            <span class="source-meta">
+              相似度: {{ (source.similarity * 100).toFixed(1) }}%
+              <span v-if="source.token_count"> | {{ source.token_count }} tokens</span>
+            </span>
+            <div v-if="source.title_path" class="source-title-path">
+              <el-icon><Folder /></el-icon> {{ source.title_path }}
+            </div>
+          </div>
         </div>
       </div>
     </el-card>
@@ -119,9 +130,21 @@
 import { ref, computed, onMounted } from 'vue'
 import { marked } from 'marked'
 import { ElMessage } from 'element-plus'
-import { Search, Link, Refresh, MagicStick, Delete } from '@element-plus/icons-vue'
+import { Search, Link, Refresh, MagicStick, Delete, Folder } from '@element-plus/icons-vue'
 import { askQuestion, getQAHistory, clearCache } from '@/api'
 import type { QAResponse, QAHistory } from '@/types'
+
+const getBlockTypeText = (type: string) => {
+  const map: Record<string, string> = {
+    'title': '标题',
+    'paragraph': '段落',
+    'list': '列表',
+    'table': '表格',
+    'code': '代码',
+    'mixed': '混合'
+  }
+  return map[type] || type
+}
 
 const question = ref('')
 const topK = ref(5)
@@ -307,8 +330,19 @@ onMounted(() => { fetchHistory() })
 .answer-content { padding: 20px; background: #f9fafb; border-radius: 8px; min-height: 100px; }
 .sources-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ebeef5; }
 .sources-section h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #606266; }
-.sources-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.source-tag { margin-bottom: 8px; }
+.sources-list { display: flex; flex-direction: column; gap: 12px; }
+.source-item {
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.source-tag { margin-bottom: 0; }
+.source-meta { color: #909399; font-size: 12px; }
+.source-title-path { width: 100%; color: #606266; font-size: 12px; display: flex; align-items: center; gap: 4px; }
 .history-card { margin-bottom: 20px; }
 .history-actions { display: flex; gap: 8px; }
 .history-list { max-height: 400px; overflow-y: auto; }

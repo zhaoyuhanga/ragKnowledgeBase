@@ -1,6 +1,7 @@
 """
 RAG 问答系统 - 文档服务模块
 文档上传、解析、存储和管理
+使用 SemanticChunker 进行结构化切分
 """
 
 import os
@@ -14,12 +15,11 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.document import Document, DocumentChunk
 from app.utils.file_parser import FileParser, file_parser
-from app.utils.text_splitter import TextSplitter, text_splitter
+from app.utils.semantic_chunker import SemanticChunker, semantic_chunker
 from app.services.embedding_service import embedding_service, get_embedding_service
 from app.core.vectorstore import vector_store, get_vector_store
 from app.core.database import get_db_session
 from app.core.logger import get_logger, document_logger
-from app.core.runtime_config import runtime_config
 
 logger = get_logger(__name__)
 
@@ -36,10 +36,10 @@ class DocumentService:
     def __init__(
         self,
         parser: FileParser = None,
-        splitter: TextSplitter = None,
+        chunker: SemanticChunker = None,
     ):
         self.parser = parser or file_parser
-        self.splitter = splitter or text_splitter
+        self.chunker = chunker or semantic_chunker
         self.embedding_service = get_embedding_service()
         self.vector_store = get_vector_store()
 
@@ -109,47 +109,67 @@ class DocumentService:
             if not content or not content.strip():
                 raise ValueError("文档内容为空")
 
-            logger.info(f"正在切分文档文本...")
-            splitter = TextSplitter(
-                chunk_size=runtime_config.chunk_size,
-                chunk_overlap=runtime_config.chunk_overlap,
-                min_chunk_size=runtime_config.chunk_min_size,
+            logger.info("正在切分文档文本...")
+            chunks = self.chunker.split_text(
+                text=content,
+                document_id=document_id
             )
-            chunks = splitter.split_text(content)
 
             if not chunks:
                 raise ValueError("文档切分后无有效内容")
 
             logger.info(f"正在向量化 {len(chunks)} 个文本块...")
-            embeddings = self.embedding_service.encode(chunks)
+
+            # 使用 enhanced_content 进行 embedding
+            texts_for_embedding = [chunk.enhanced_content for chunk in chunks]
+            embeddings = self.embedding_service.encode(texts_for_embedding)
 
             vector_ids = [f"{document_id}_{i}_{uuid.uuid4().hex[:8]}" for i in range(len(chunks))]
 
-            metadatas = [
-                {
+            # 构建 Milvus metadata
+            metadatas = []
+            for i, chunk in enumerate(chunks):
+                metadata = {
                     "document_id": document_id,
                     "chunk_index": i,
                     "filename": Path(file_path).name,
                     "file_type": file_type,
-                    "char_count": len(chunk),
+                    "char_count": chunk.metadata.char_count,
+                    "token_count": chunk.metadata.token_count,
+                    "content_hash": chunk.metadata.content_hash,
+                    "title_path": chunk.metadata.title_path,
+                    "section_level": chunk.metadata.section_level,
+                    "block_type": chunk.metadata.block_type,
+                    "parent_section_id": chunk.metadata.parent_section_id,
+                    "chunk_version": chunk.metadata.chunk_version,
+                    "page_no": chunk.metadata.page_no,
                 }
-                for i, chunk in enumerate(chunks)
-            ]
+                metadatas.append(metadata)
 
+            # 添加向量到 Milvus
+            documents_for_milvus = [chunk.content for chunk in chunks]
             self.vector_store.add_vectors(
-                documents=chunks,
+                documents=documents_for_milvus,
                 embeddings=embeddings,
                 ids=vector_ids,
                 metadatas=metadatas
             )
 
+            # 保存到数据库
             for i, (chunk, vector_id, metadata) in enumerate(zip(chunks, vector_ids, metadatas)):
                 chunk_record = DocumentChunk(
                     document_id=document_id,
-                    chunk_index=i,
-                    content=chunk,
-                    char_count=len(chunk),
+                    chunk_index=chunk.metadata.chunk_index,
+                    content=chunk.content,
+                    char_count=chunk.metadata.char_count,
                     vector_id=vector_id,
+                    # 新增字段（如果表中有这些列）
+                    title_path=chunk.metadata.title_path,
+                    section_level=chunk.metadata.section_level,
+                    block_type=chunk.metadata.block_type,
+                    token_count=chunk.metadata.token_count,
+                    content_hash=chunk.metadata.content_hash,
+                    chunk_version=chunk.metadata.chunk_version,
                 )
                 db.add(chunk_record)
 
@@ -192,40 +212,27 @@ class DocumentService:
         generated_at_end=None,
         question_keyword: str = None
     ) -> Tuple[List[Document], int]:
-        """获取文档列表
-        
-        Args:
-            db: 数据库会话
-            skip: 跳过数量
-            limit: 返回数量
-            status: 状态过滤
-            source_type: 来源类型过滤: local | ai_generated
-            llm_model: LLM模型过滤
-            llm_provider: LLM提供商过滤
-            generated_at_start: 生成时间开始
-            generated_at_end: 生成时间结束
-            question_keyword: 原始问题关键词
-        """
+        """获取文档列表"""
         query = db.query(Document)
 
         if status is not None:
             query = query.filter(Document.status == status)
-        
+
         if source_type:
             query = query.filter(Document.source_type == source_type)
-        
+
         if llm_model:
             query = query.filter(Document.llm_model == llm_model)
-        
+
         if llm_provider:
             query = query.filter(Document.llm_provider == llm_provider)
-        
+
         if generated_at_start:
             query = query.filter(Document.generated_at >= generated_at_start)
-        
+
         if generated_at_end:
             query = query.filter(Document.generated_at <= generated_at_end)
-        
+
         if question_keyword:
             query = query.filter(Document.generated_from_question.like(f"%{question_keyword}%"))
 

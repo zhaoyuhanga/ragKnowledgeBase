@@ -1,9 +1,11 @@
 """
 RAG 问答系统 - 知识库服务模块
 知识库索引管理和统计
+使用 SemanticChunker 进行结构化切分
 """
 
 import time
+import uuid
 from datetime import datetime
 from typing import Dict, Any, List
 
@@ -16,6 +18,7 @@ from app.services.embedding_service import embedding_service, get_embedding_serv
 from app.core.vectorstore import vector_store, get_vector_store
 from app.core.logger import get_logger, knowledge_logger
 from app.core.runtime_config import runtime_config
+from app.utils.semantic_chunker import SemanticChunker, semantic_chunker
 
 logger = get_logger(__name__)
 
@@ -26,6 +29,7 @@ class KnowledgeService:
     def __init__(self):
         self.embedding_service = get_embedding_service()
         self.vector_store = get_vector_store()
+        self.chunker = semantic_chunker
 
     def get_stats(self, db: Session) -> Dict[str, Any]:
         """获取知识库统计信息"""
@@ -78,8 +82,8 @@ class KnowledgeService:
                     "today_queries": today_queries,
                 },
                 "config": {
-                    "chunk_size": runtime_config.chunk_size,
-                    "chunk_overlap": runtime_config.chunk_overlap,
+                    "chunk_target_tokens": settings.chunk_target_tokens,
+                    "chunk_max_tokens": settings.chunk_max_tokens,
                     "retrieval_top_k": runtime_config.retrieval_top_k,
                     "similarity_threshold": runtime_config.similarity_threshold,
                     "embedding_model": settings.embedding_model,
@@ -159,8 +163,6 @@ class KnowledgeService:
     async def _reindex_document(self, document: Document, db: Session) -> int:
         """重新索引单个文档"""
         from app.utils.file_parser import FileParser, file_parser
-        from app.utils.text_splitter import TextSplitter, text_splitter
-        import uuid
 
         try:
             parser = FileParser()
@@ -169,33 +171,42 @@ class KnowledgeService:
             if not content:
                 raise ValueError("文档内容为空")
 
-            splitter = TextSplitter(
-                chunk_size=runtime_config.chunk_size,
-                chunk_overlap=runtime_config.chunk_overlap,
-                min_chunk_size=runtime_config.chunk_min_size,
+            # 使用 SemanticChunker
+            chunks = self.chunker.split_text(
+                text=content,
+                document_id=document.id
             )
-            chunks = splitter.split_text(content)
 
             if not chunks:
                 raise ValueError("文档切分后无有效内容")
 
-            embeddings = self.embedding_service.encode(chunks)
+            # 使用 enhanced_content 进行 embedding
+            texts_for_embedding = [chunk.enhanced_content for chunk in chunks]
+            embeddings = self.embedding_service.encode(texts_for_embedding)
 
             vector_ids = [f"{document.id}_{i}_{uuid.uuid4().hex[:8]}" for i in range(len(chunks))]
 
-            metadatas = [
-                {
+            # 构建 metadata
+            metadatas = []
+            for i, chunk in enumerate(chunks):
+                metadata = {
                     "document_id": document.id,
                     "chunk_index": i,
                     "filename": document.filename,
                     "file_type": document.file_type,
-                    "char_count": len(chunk),
+                    "char_count": chunk.metadata.char_count,
+                    "token_count": chunk.metadata.token_count,
+                    "content_hash": chunk.metadata.content_hash,
+                    "title_path": chunk.metadata.title_path,
+                    "section_level": chunk.metadata.section_level,
+                    "block_type": chunk.metadata.block_type,
+                    "parent_section_id": chunk.metadata.parent_section_id,
+                    "chunk_version": chunk.metadata.chunk_version,
                 }
-                for i, chunk in enumerate(chunks)
-            ]
+                metadatas.append(metadata)
 
             self.vector_store.add_vectors(
-                documents=chunks,
+                documents=[c.content for c in chunks],
                 embeddings=embeddings,
                 ids=vector_ids,
                 metadatas=metadatas
@@ -204,9 +215,16 @@ class KnowledgeService:
             for i, (chunk, vector_id, metadata) in enumerate(zip(chunks, vector_ids, metadatas)):
                 chunk_record = DocumentChunk(
                     document_id=document.id,
-                    chunk_index=i,
-                    content=chunk,
-                    char_count=len(chunk),
+                    chunk_index=chunk.metadata.chunk_index,
+                    content=chunk.content,
+                    char_count=chunk.metadata.char_count,
+                    token_count=chunk.metadata.token_count,
+                    content_hash=chunk.metadata.content_hash,
+                    title_path=chunk.metadata.title_path,
+                    section_level=chunk.metadata.section_level,
+                    block_type=chunk.metadata.block_type,
+                    parent_section_id=chunk.metadata.parent_section_id,
+                    chunk_version=chunk.metadata.chunk_version,
                     vector_id=vector_id,
                 )
                 db.add(chunk_record)
@@ -252,6 +270,8 @@ class KnowledgeService:
                     "chunk_index": metadata.get("chunk_index"),
                     "filename": metadata.get("filename"),
                     "content": document,
+                    "title_path": metadata.get("title_path"),
+                    "block_type": metadata.get("block_type"),
                     "similarity": round(similarity, 4),
                 })
 

@@ -3,13 +3,13 @@ RAG 问答系统 - 工具模块
 """
 
 from app.utils.file_parser import FileParser, file_parser, get_file_parser
-from app.utils.text_splitter import TextSplitter, text_splitter, get_text_splitter
+from app.utils.semantic_chunker import SemanticChunker, semantic_chunker, get_semantic_chunker
 
 __all__ = [
     "FileParser",
     "file_parser",
     "get_file_parser",
-    "TextSplitter",
-    "text_splitter",
-    "get_text_splitter",
+    "SemanticChunker",
+    "semantic_chunker",
+    "get_semantic_chunker",
 ]

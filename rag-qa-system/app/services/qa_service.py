@@ -16,12 +16,12 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.document import Document, DocumentChunk, QALog
 from app.services.embedding_service import embedding_service, get_embedding_service
+from app.services.reranker_service import reranker_service, get_reranker_service
 from app.core.vectorstore import vector_store, get_vector_store
 from app.core.cache import redis_cache, get_redis_cache
 from app.core.llm import llm_client, get_llm_client, DEFAULT_SYSTEM_PROMPT, AI_GENERATE_SYSTEM_PROMPT
 from app.core.runtime_config import runtime_config
 from app.core.logger import get_logger, qa_logger
-from app.utils.text_splitter import get_text_splitter
 
 logger = get_logger(__name__)
 
@@ -37,6 +37,7 @@ class QAService:
         self.vector_store = get_vector_store()
         self.cache = get_redis_cache()
         self.llm = get_llm_client()
+        self.reranker = get_reranker_service()
 
     async def ask(
         self,
@@ -88,10 +89,14 @@ class QAService:
             logger.info(f"正在处理问题: {question[:50]}...")
             query_embedding = self.embedding_service.encode_single(question)
 
+            # 根据是否启用 Reranker 决定召回数量
             k = top_k or runtime_config.retrieval_top_k
+            recall_k = self.reranker.recall_k if self.reranker.enabled else k
+
+            # 向量检索
             search_results = self.vector_store.search_vectors(
                 query_embedding=query_embedding,
-                n_results=k,
+                n_results=recall_k,  # 使用更大的召回数量供 reranker 使用
                 where=None
             )
 
@@ -106,7 +111,18 @@ class QAService:
                     "response_time_ms": int(elapsed),
                 }
 
-            context_texts = [chunk["content"] for chunk in retrieved_chunks]
+            # Rerank 处理
+            rerank_result = self.reranker.rerank(question, retrieved_chunks)
+            final_chunks = [c.to_dict() for c in rerank_result.candidates]
+
+            # 记录 rerank 日志
+            logger.info(
+                f"Rerank 结果: 原始 {rerank_result.original_count} -> 最终 {len(final_chunks)}, "
+                f"耗时 {rerank_result.rerank_time_ms:.2f}ms, "
+                f"降级={rerank_result.is_degraded}, 原因={rerank_result.degrade_reason}"
+            )
+
+            context_texts = [chunk["content"] for chunk in final_chunks]
 
             conversation_history = []
             if session_id:
@@ -129,7 +145,7 @@ class QAService:
             qa_logger.log_query(
                 question,
                 len(answer),
-                len(retrieved_chunks),
+                len(final_chunks),
                 False,
                 "success",
                 elapsed
@@ -138,7 +154,7 @@ class QAService:
             qa_log = QALog(
                 question=question,
                 answer=answer,
-                referenced_chunks=[chunk["vector_id"] for chunk in retrieved_chunks],
+                referenced_chunks=[chunk["vector_id"] for chunk in final_chunks],
                 response_time_ms=int(elapsed),
                 cache_hit=False,
                 source_type="local",
@@ -147,16 +163,26 @@ class QAService:
             db.add(qa_log)
             db.commit()
 
+            # 构建来源信息，包含 title_path 和 page_no 用于引用
             sources = [
                 {
                     "chunk_id": chunk.get("chunk_id"),
                     "vector_id": chunk["vector_id"],
                     "document_id": chunk["document_id"],
                     "filename": chunk["filename"],
+                    # 原始 content 用于 LLM 回答引用
                     "content": chunk["content"][:200] + "..." if len(chunk["content"]) > 200 else chunk["content"],
-                    "similarity": chunk["similarity"],
+                    # 标题路径用于引用
+                    "title_path": chunk.get("title_path", ""),
+                    # 页码用于引用
+                    "page_no": chunk.get("page_no"),
+                    # 块类型
+                    "block_type": chunk.get("block_type", "paragraph"),
+                    # 相似度
+                    "similarity": chunk["score"],
+                    "rank": i,
                 }
-                for chunk in retrieved_chunks
+                for i, chunk in enumerate(final_chunks)
             ]
 
             self.cache.set_qa_cache(question, answer, sources)
@@ -166,6 +192,13 @@ class QAService:
                 "sources": sources,
                 "cache_hit": False,
                 "response_time_ms": int(elapsed),
+                "rerank_info": {
+                    "original_count": rerank_result.original_count,
+                    "final_count": len(final_chunks),
+                    "rerank_time_ms": rerank_result.rerank_time_ms,
+                    "is_degraded": rerank_result.is_degraded,
+                    "degrade_reason": rerank_result.degrade_reason,
+                }
             }
 
         except Exception as e:
@@ -208,6 +241,14 @@ class QAService:
                 "file_type": metadata.get("file_type"),
                 "content": document,
                 "char_count": metadata.get("char_count", len(document)),
+                "token_count": metadata.get("token_count"),
+                "content_hash": metadata.get("content_hash"),
+                "title_path": metadata.get("title_path"),
+                "section_level": metadata.get("section_level"),
+                "block_type": metadata.get("block_type"),
+                "parent_section_id": metadata.get("parent_section_id"),
+                "chunk_version": metadata.get("chunk_version"),
+                "page_no": metadata.get("page_no"),
                 "similarity": round(similarity, 4),
             })
 
@@ -422,9 +463,10 @@ class QAService:
                 return
             
             # 标准搜索逻辑（非 AI 生成模式）
+            recall_k = self.reranker.recall_k if self.reranker.enabled else k
             search_results = self.vector_store.search_vectors(
                 query_embedding=query_embedding,
-                n_results=k,
+                n_results=recall_k,
                 where=None,
                 source_type=search_mode if search_mode != "all" else None
             )
@@ -436,9 +478,9 @@ class QAService:
                     # AI 扩展模式：直接调用 LLM 生成回答
                     yield "data: {\"type\":\"sources\",\"sources\":[]}\n\n"
                     yield "data: {\"type\":\"ai_extend\",\"status\":\"generating\"}\n\n"
-                    
-                    logger.info(f"本地检索为空，启用AI扩展生成...")
-                    
+
+                    logger.info("本地检索为空，启用AI扩展生成...")
+
                     conversation_history = []
                     if session_id:
                         history_logs, _ = self.get_qa_history(db, session_id=session_id, limit=5)
@@ -447,7 +489,7 @@ class QAService:
                                 conversation_history.append({"role": "user", "content": log.question})
                                 if log.answer:
                                     conversation_history.append({"role": "assistant", "content": log.answer})
-                    
+
                     # 直接调用 LLM 流式生成（无上下文）
                     full_answer = ""
                     for token in self.llm.generate_with_context_stream(
@@ -461,7 +503,7 @@ class QAService:
                         yield f"data: {{\"type\":\"token\",\"content\":{json.dumps(token)}}}\n\n"
 
                     elapsed = (time.time() - start_time) * 1000
-                    
+
                     # 检查回答是否有效
                     invalid_patterns = [
                         "无法回答", "知识库中", "没有找到", "未包含", "没有相关",
@@ -471,7 +513,7 @@ class QAService:
                         len(full_answer.strip()) < 10 or
                         any(pattern in full_answer for pattern in invalid_patterns)
                     )
-                    
+
                     # 只有有效回答才保存
                     ai_doc_id = None
                     if not is_invalid_answer and len(full_answer.strip()) >= 10:
@@ -482,7 +524,7 @@ class QAService:
                         )
                     else:
                         logger.info(f"AI 生成内容无效，跳过保存: len={len(full_answer)}")
-                    
+
                     qa_logger.log_query(
                         question,
                         len(full_answer),
@@ -491,7 +533,7 @@ class QAService:
                         "ai_extend",
                         elapsed
                     )
-                    
+
                     # 保存到历史记录
                     # AI 扩展模式，来源类型是 ai_generated
                     qa_log = QALog(
@@ -505,10 +547,10 @@ class QAService:
                     )
                     db.add(qa_log)
                     db.commit()
-                    
+
                     # 保存到缓存
                     self.cache.set_qa_cache(question, full_answer, [])
-                    
+
                     yield f"data: {{\"type\":\"done\",\"answer\":{json.dumps(full_answer)},\"sources\":[],\"response_time_ms\":{int(elapsed)},\"cache_hit\":false,\"ai_extend\":true,\"ai_doc_id\":{ai_doc_id}}}\n\n"
                     yield "data: [DONE]\n\n"
                     return
@@ -518,7 +560,18 @@ class QAService:
                     yield "data: [DONE]\n\n"
                     return
 
-            context_texts = [chunk["content"] for chunk in retrieved_chunks]
+            # Rerank 处理
+            rerank_result = self.reranker.rerank(question, retrieved_chunks)
+            final_chunks = [c.to_dict() for c in rerank_result.candidates]
+
+            # 记录 rerank 日志
+            logger.info(
+                f"Rerank 结果: 原始 {rerank_result.original_count} -> 最终 {len(final_chunks)}, "
+                f"耗时 {rerank_result.rerank_time_ms:.2f}ms, "
+                f"降级={rerank_result.is_degraded}, 原因={rerank_result.degrade_reason}"
+            )
+
+            context_texts = [chunk["content"] for chunk in final_chunks]
 
             conversation_history = []
             if session_id:
@@ -536,9 +589,10 @@ class QAService:
                     "document_id": chunk["document_id"],
                     "filename": chunk["filename"],
                     "content": chunk["content"][:200] + "..." if len(chunk["content"]) > 200 else chunk["content"],
-                    "similarity": chunk["similarity"],
+                    "similarity": chunk["score"],
+                    "rank": i,
                 }
-                for chunk in retrieved_chunks
+                for i, chunk in enumerate(final_chunks)
             ]
 
             yield f"data: {{\"type\":\"sources\",\"sources\":{json.dumps(sources)}}}\n\n"
@@ -559,7 +613,7 @@ class QAService:
             qa_logger.log_query(
                 question,
                 len(full_answer),
-                len(retrieved_chunks),
+                len(final_chunks),
                 False,
                 "success",
                 elapsed
@@ -568,7 +622,7 @@ class QAService:
             qa_log = QALog(
                 question=question,
                 answer=full_answer,
-                referenced_chunks=[chunk["vector_id"] for chunk in retrieved_chunks],
+                referenced_chunks=[chunk["vector_id"] for chunk in final_chunks],
                 response_time_ms=int(elapsed),
                 cache_hit=False,
                 source_type="local",
@@ -579,7 +633,16 @@ class QAService:
 
             self.cache.set_qa_cache(question, full_answer, sources)
 
-            yield f"data: {{\"type\":\"done\",\"answer\":{json.dumps(full_answer)},\"sources\":{json.dumps(sources)},\"response_time_ms\":{int(elapsed)},\"cache_hit\":false,\"ai_extend\":false}}\n\n"
+            # 构建 rerank_info
+            rerank_info = {
+                "original_count": rerank_result.original_count,
+                "final_count": len(final_chunks),
+                "rerank_time_ms": rerank_result.rerank_time_ms,
+                "is_degraded": rerank_result.is_degraded,
+                "degrade_reason": rerank_result.degrade_reason or ""
+            }
+
+            yield f"data: {{\"type\":\"done\",\"answer\":{json.dumps(full_answer)},\"sources\":{json.dumps(sources)},\"response_time_ms\":{int(elapsed)},\"cache_hit\":false,\"ai_extend\":false,\"rerank_info\":{json.dumps(rerank_info)}}}\n\n"
             yield "data: [DONE]\n\n"
 
         except Exception as e:
@@ -675,9 +738,10 @@ def _save_ai_generated_content(
         
         logger.info(f"Document 创建成功: doc_id={doc.id}")
         
-        # 2. 切分文本
-        text_splitter = get_text_splitter()
-        chunks = text_splitter.split_text(answer)
+        # 2. 使用 SemanticChunker 切分文本
+        from app.utils.semantic_chunker import get_semantic_chunker
+        chunker = get_semantic_chunker()
+        chunks = chunker.split_text(answer, document_id=doc.id)
         logger.info(f"文本切分完成: {len(chunks)} 个 chunks")
         
         if not chunks:
@@ -689,18 +753,25 @@ def _save_ai_generated_content(
         # 3. 创建 DocumentChunk 记录
         embedding_service = get_embedding_service()
         vector_store = get_vector_store()
-        
-        for idx, chunk_text in enumerate(chunks):
-            # 生成向量
-            embedding = embedding_service.encode_single(chunk_text)
+
+        for idx, chunk in enumerate(chunks):
+            # 使用 enhanced_content 进行 embedding
+            embedding = embedding_service.encode_single(chunk.enhanced_content)
             vector_id = f"{doc.id}_{idx}_{question_hash}"
-            
+
             # 创建 chunk 记录
             chunk_model = DocumentChunk(
                 document_id=doc.id,
-                chunk_index=idx,
-                content=chunk_text,
-                char_count=len(chunk_text),
+                chunk_index=chunk.metadata.chunk_index,
+                content=chunk.content,
+                char_count=chunk.metadata.char_count,
+                token_count=chunk.metadata.token_count,
+                content_hash=chunk.metadata.content_hash,
+                title_path=chunk.metadata.title_path,
+                section_level=chunk.metadata.section_level,
+                block_type=chunk.metadata.block_type,
+                parent_section_id=chunk.metadata.parent_section_id,
+                chunk_version=chunk.metadata.chunk_version,
                 vector_id=vector_id,
                 source_type="ai_generated",
                 generated_from_question=question,
@@ -710,22 +781,30 @@ def _save_ai_generated_content(
             )
             db.add(chunk_model)
             db.flush()
-            
+
             # 4. 添加向量到 Milvus
             metadata = {
                 "document_id": doc.id,
                 "chunk_index": idx,
                 "filename": filename,
+                "char_count": chunk.metadata.char_count,
+                "token_count": chunk.metadata.token_count,
+                "content_hash": chunk.metadata.content_hash,
+                "title_path": chunk.metadata.title_path,
+                "section_level": chunk.metadata.section_level,
+                "block_type": chunk.metadata.block_type,
+                "parent_section_id": chunk.metadata.parent_section_id,
+                "chunk_version": chunk.metadata.chunk_version,
                 "source_type": "ai_generated",
                 "generated_from_question": question,
                 "generated_at": datetime.now().isoformat(),
                 "llm_model": settings.deepseek_model,
                 "llm_provider": "deepseek",
             }
-            
+
             try:
                 vector_store.add_vectors(
-                    documents=[chunk_text],
+                    documents=[chunk.content],
                     embeddings=[embedding],
                     ids=[vector_id],
                     metadatas=[metadata]

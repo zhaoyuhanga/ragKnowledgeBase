@@ -70,11 +70,39 @@ class Settings(BaseSettings):
     milvus_nlist: int = Field(default=1024, description="nlist 参数")
     
     # ============ Embedding 模型配置 ============
-    embedding_model: str = Field(default="moka-ai/m3e-base", description="Embedding 模型名称")
-    embedding_device: str = Field(default="cpu", description="运行设备: cpu | cuda | mps")
-    embedding_dimension: int = Field(default=768, description="向量维度")
+    embedding_provider: str = Field(default="ollama", description="Embedding 提供者: ollama | sentence_transformers")
+    embedding_model: str = Field(default="batiai/qwen3-embedding:4b-q6", description="Embedding 模型名称 (Ollama 模型名)")
+    embedding_device: str = Field(default="cpu", description="运行设备: cpu | cuda | mps (仅 sentence_transformers 使用)")
+    embedding_dimension: int = Field(default=2560, description="向量维度 (Ollama qwen3-embedding-4b 输出 2560)")
     embedding_batch_size: int = Field(default=32, description="批量处理大小")
-    
+    # Ollama 特有配置
+    embedding_base_url: str = Field(default="http://localhost:11434", description="Ollama API 基础 URL")
+    embedding_timeout: int = Field(default=60, description="Embedding 请求超时时间（秒）")
+    embedding_max_retries: int = Field(default=3, description="Embedding 最大重试次数")
+
+    # ============ Reranker 配置 ============
+    reranker_enabled: bool = Field(default=False, description="是否启用 Reranker")
+    reranker_model: str = Field(default="bantai/qwen3-reranker:1.5b-q4", description="Reranker 模型名称 (Ollama 模型名)")
+    reranker_base_url: str = Field(default="http://localhost:11434", description="Reranker API 基础 URL")
+    reranker_timeout: int = Field(default=30, description="Reranker 请求超时时间（秒）")
+    reranker_max_retries: int = Field(default=2, description="Reranker 最大重试次数")
+    reranker_recall_k: int = Field(default=50, description="Reranker 召回数量（rerank 前从 Milvus 召回的数量）")
+    reranker_top_k: int = Field(default=10, description="Reranker 输出数量（rerank 后返回给 LLM 的数量）")
+
+    # ============ Sparse/BM25 配置 ============
+    sparse_enabled: bool = Field(default=False, description="是否启用 Sparse 检索")
+    sparse_weight: float = Field(default=0.3, description="Sparse 检索权重（用于与 dense 检索结果融合）")
+    bm25_k1: float = Field(default=1.5, description="BM25 参数 k1")
+    bm25_b: float = Field(default=0.75, description="BM25 参数 b")
+    rrf_k: int = Field(default=60, description="RRF 融合参数 k（用于 Reciprocal Rank Fusion）")
+
+    # ============ SemanticChunker 配置 ============
+    chunk_target_tokens: int = Field(default=600, description="Chunk 目标 token 数")
+    chunk_max_tokens: int = Field(default=900, description="Chunk 最大 token 数")
+    chunk_min_tokens: int = Field(default=120, description="Chunk 最小 token 数")
+    chunk_overlap_tokens: int = Field(default=100, description="Chunk overlap token 数")
+    chunk_version: str = Field(default="semantic-v1", description="Chunk 版本号")
+
     # ============ 文件上传配置 ============
     upload_dir: str = Field(default="./data/documents", description="文档存储目录")
     allowed_extensions: str = Field(default="pdf,md,txt,docx", description="允许的文件扩展名")
