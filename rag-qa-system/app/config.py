@@ -89,9 +89,9 @@ class Settings(BaseSettings):
     # ============ 日志配置 ============
     log_level: str = Field(default="INFO", description="日志级别")
     log_format: str = Field(default="json", description="日志格式: json | console")
-    log_file_path: str = Field(default="./logs/rag_qa.log", description="日志文件路径")
+    log_file_path: str = Field(default="./logs/rag_qa.log", description="日志文件路径（实际文件名为 rag_qa.YYYY-MM-DD.log）")
     log_file_max_size: int = Field(default=10485760, description="日志文件最大大小（字节）")
-    log_file_backup_count: int = Field(default=5, description="日志文件保留数量")
+    log_file_backup_count: int = Field(default=5, description="日志文件保留天数")
     log_console: bool = Field(default=True, description="是否在控制台输出日志")
     
     # ============ CORS 跨域配置 ============

@@ -67,22 +67,25 @@ class LogManager:
         log_file_path = Path(settings.log_file_path)
         log_file_path.parent.mkdir(parents=True, exist_ok=True)
         
+        # 日志文件名格式：rag_qa_2026-05-17.log（使用 {time} 占位符自动包含日期）
+        daily_log_file = f"{log_file_path.stem}.{{time:YYYY-MM-DD}}.{log_file_path.suffix.lstrip('.')}"
+        
         if settings.log_format == "json":
             logger.add(
-                settings.log_file_path,
+                str(log_file_path.parent / daily_log_file),
                 level=log_level,
                 format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}",
-                rotation=settings.log_file_max_size,
+                rotation="00:00",  # 每天午夜轮转
                 retention=settings.log_file_backup_count,
                 compression="zip",
                 serialize=True  # JSON 格式
             )
         else:
             logger.add(
-                settings.log_file_path,
+                str(log_file_path.parent / daily_log_file),
                 level=log_level,
                 format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}",
-                rotation=settings.log_file_max_size,
+                rotation="00:00",  # 每天午夜轮转
                 retention=settings.log_file_backup_count,
                 compression="zip"
             )
