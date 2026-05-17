@@ -1,17 +1,25 @@
-﻿<template>
+<template>
   <div class="documents-page">
     <el-card shadow="hover" class="toolbar-card">
       <div class="toolbar">
         <div class="toolbar-left">
-          <el-input v-model="searchKeyword" placeholder="搜索文档名称" style="width: 300px" clearable>
+          <el-input v-model="searchKeyword" placeholder="搜索文档名称" style="width: 200px" clearable>
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
-          <el-select v-model="statusFilter" placeholder="状态筛选" style="width: 150px">
-            <el-option label="全部" value="" />
+          <el-select v-model="statusFilter" placeholder="状态筛选" style="width: 120px">
+            <el-option label="全部状态" value="" />
             <el-option label="处理中" value="processing" />
             <el-option label="已完成" value="completed" />
             <el-option label="失败" value="failed" />
           </el-select>
+          <el-select v-model="sourceTypeFilter" placeholder="来源筛选" style="width: 130px">
+            <el-option label="全部来源" value="" />
+            <el-option label="本地导入" value="local" />
+            <el-option label="AI 生成" value="ai_generated" />
+          </el-select>
+          <el-input v-if="sourceTypeFilter === 'ai_generated'" v-model="questionKeyword" placeholder="搜索原始问题" style="width: 180px" clearable>
+            <template #prefix><el-icon><Search /></el-icon></template>
+          </el-input>
         </div>
         <div class="toolbar-right">
           <el-button type="primary" @click="showUploadDialog"><el-icon><Upload /></el-icon>上传文档</el-button>
@@ -26,7 +34,22 @@
       <div v-else class="documents-table">
         <el-table :data="filteredDocuments" stripe style="width: 100%">
           <el-table-column prop="filename" label="文档名称" min-width="200">
-            <template #default="{ row }"><div class="document-title"><el-icon><Document /></el-icon><span>{{ row.filename }}</span></div></template>
+            <template #default="{ row }">
+              <div class="document-title">
+                <el-icon :style="{ color: row.source_type === 'ai_generated' ? '#E6A23C' : '#409EFF' }">
+                  <component :is="row.source_type === 'ai_generated' ? 'MagicStick' : 'Document'" />
+                </el-icon>
+                <span>{{ row.filename }}</span>
+                <el-tag v-if="row.source_type === 'ai_generated'" type="warning" size="small" style="margin-left: 8px">AI</el-tag>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="source_type" label="来源" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.source_type === 'ai_generated' ? 'warning' : 'primary'" size="small">
+                {{ row.source_type === 'ai_generated' ? 'AI生成' : '本地导入' }}
+              </el-tag>
+            </template>
           </el-table-column>
           <el-table-column prop="file_type" label="类型" width="100">
             <template #default="{ row }"><el-tag size="small" :type="getFileTypeTag(row.file_type)">{{ row.file_type.toUpperCase() }}</el-tag></template>
@@ -36,7 +59,13 @@
             <template #default="{ row }"><el-tag :type="getStatusType(row.status)" size="small">{{ getStatusText(row.status) }}</el-tag></template>
           </el-table-column>
           <el-table-column prop="chunk_count" label="文档块" width="100" align="center" />
-          <el-table-column prop="created_at" label="上传时间" width="180"><template #default="{ row }">{{ formatTime(row.created_at) }}</template></el-table-column>
+          <el-table-column v-if="hasAiGeneratedDocs" prop="llm_model" label="LLM模型" width="140">
+            <template #default="{ row }">
+              <span v-if="row.llm_model">{{ row.llm_model }}</span>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="创建时间" width="180"><template #default="{ row }">{{ formatTime(row.created_at) }}</template></el-table-column>
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="previewDocument(row)">预览</el-button>
@@ -53,7 +82,7 @@
     <el-dialog v-model="uploadDialogVisible" title="上传文档" width="500px" @closed="handleUploadClosed">
       <el-upload ref="uploadRef" class="upload-area" drag :auto-upload="false" :on-change="handleFileChange" :on-remove="handleFileRemove" :limit="10" accept=".pdf,.docx,.doc,.txt,.md" multiple>
         <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-        <div class="el-upload__text">将文件拖到此处，或<em>点决上传</em></div>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
         <template #tip><div class="el-upload__tip">支持 PDF、DOCX、DOC、TXT、MD 格式，单个文件不超过 50MB</div></template>
       </el-upload>
       <template #footer>
@@ -64,7 +93,18 @@
 
     <el-dialog v-model="previewDialogVisible" title="文档预览" width="800px" destroy-on-close>
       <div v-if="previewLoading" class="loading-container"><el-icon class="is-loading"><Loading /></el-icon><span>加载中...</span></div>
-      <div v-else class="preview-content markdown-content" v-html="previewContent"></div>
+      <div v-else class="preview-content">
+        <div v-if="previewDocumentData?.source_type === 'ai_generated'" class="ai-info">
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="来源类型"><el-tag type="warning">AI 生成</el-tag></el-descriptions-item>
+            <el-descriptions-item label="LLM 模型">{{ previewDocumentData.llm_model || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="LLM 提供商">{{ previewDocumentData.llm_provider || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="生成时间">{{ previewDocumentData.generated_at ? formatTime(previewDocumentData.generated_at) : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="原始问题" :span="2">{{ previewDocumentData.generated_from_question || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+        <div class="preview-content-body markdown-content" v-html="previewContent"></div>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -73,7 +113,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { marked } from 'marked'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Upload, Document, Loading, UploadFilled } from '@element-plus/icons-vue'
+import { Search, Refresh, Upload, Document, Loading, UploadFilled, MagicStick } from '@element-plus/icons-vue'
 import { getDocuments, deleteDocument, previewDocument as previewAPI, uploadDocument as uploadAPI } from '@/api'
 import type { Document as DocumentType } from '@/types'
 import type { UploadInstance } from 'element-plus'
@@ -85,6 +125,8 @@ const pageSize = ref(10)
 const total = ref(0)
 const searchKeyword = ref('')
 const statusFilter = ref('')
+const sourceTypeFilter = ref('')
+const questionKeyword = ref('')
 const uploadDialogVisible = ref(false)
 const uploadRef = ref<UploadInstance>()
 const fileList = ref<any[]>([])
@@ -92,10 +134,18 @@ const uploading = ref(false)
 const previewDialogVisible = ref(false)
 const previewLoading = ref(false)
 const previewContent = ref('')
+const previewDocumentData = ref<DocumentType | null>(null)
+
+const hasAiGeneratedDocs = computed(() => {
+  return documents.value.some(doc => doc.source_type === 'ai_generated')
+})
 
 const filteredDocuments = computed(() => {
-  if (!searchKeyword.value) return documents.value
-  return documents.value.filter(doc => doc.filename?.toLowerCase().includes(searchKeyword.value.toLowerCase()))
+  let result = documents.value
+  if (searchKeyword.value) {
+    result = result.filter(doc => doc.filename?.toLowerCase().includes(searchKeyword.value.toLowerCase()))
+  }
+  return result
 })
 
 const formatFileSize = (size: number) => {
@@ -107,7 +157,7 @@ const formatFileSize = (size: number) => {
 const formatTime = (time: string) => { return new Date(time).toLocaleString('zh-CN') }
 
 const getFileTypeTag = (type: string) => {
-  const map: Record<string, string> = { pdf: 'danger', docx: 'primary', doc: 'primary', txt: 'info', md: 'success' }
+  const map: Record<string, string> = { pdf: 'danger', docx: 'primary', doc: 'primary', txt: 'info', md: 'success', ai_generated: 'warning' }
   return map[type] || 'info'
 }
 
@@ -124,7 +174,21 @@ const getStatusText = (status: number) => {
 const fetchDocuments = async () => {
   loading.value = true
   try {
-    const res = await getDocuments({ page: currentPage.value, page_size: pageSize.value, status: statusFilter.value || undefined })
+    const params: Record<string, any> = {
+      page: currentPage.value,
+      page_size: pageSize.value,
+    }
+    if (statusFilter.value) {
+      const statusMap: Record<string, number> = { processing: 0, completed: 1, failed: 2 }
+      params.status = statusMap[statusFilter.value]
+    }
+    if (sourceTypeFilter.value) {
+      params.source_type = sourceTypeFilter.value
+    }
+    if (questionKeyword.value && sourceTypeFilter.value === 'ai_generated') {
+      params.question_keyword = questionKeyword.value
+    }
+    const res = await getDocuments(params)
     documents.value = res.data.items
     total.value = res.data.total
   } catch (error) { console.error('Failed to fetch documents:', error) }
@@ -158,7 +222,9 @@ const handleUpload = async () => {
 }
 
 const previewDocument = async (doc: DocumentType) => {
-  previewDialogVisible.value = true; previewLoading.value = true
+  previewDialogVisible.value = true
+  previewLoading.value = true
+  previewDocumentData.value = doc
   try {
     const res = await previewAPI(doc.id)
     previewContent.value = marked(res.data.content || '无法预览此文档')
@@ -182,7 +248,7 @@ onMounted(() => { fetchDocuments() })
 .documents-page { max-width: 1400px; margin: 0 auto; }
 .toolbar-card { margin-bottom: 20px; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; }
-.toolbar-left, .toolbar-right { display: flex; gap: 12px; }
+.toolbar-left, .toolbar-right { display: flex; gap: 12px; align-items: center; }
 .loading-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 0; gap: 12px; color: #909399; }
 .empty-state { text-align: center; padding: 80px 0; color: #909399; }
 .empty-state .el-icon { font-size: 64px; margin-bottom: 16px; }
@@ -191,5 +257,7 @@ onMounted(() => { fetchDocuments() })
 .document-title .el-icon { color: #409EFF; }
 .pagination-wrapper { margin-top: 20px; display: flex; justify-content: flex-end; }
 .upload-area { width: 100%; }
-.preview-content { max-height: 500px; overflow-y: auto; padding: 20px; background: #f9fafb; border-radius: 8px; }
+.preview-content { display: flex; flex-direction: column; gap: 16px; }
+.ai-info { background: #fdf6ec; padding: 16px; border-radius: 8px; }
+.preview-content-body { max-height: 500px; overflow-y: auto; padding: 20px; background: #f9fafb; border-radius: 8px; }
 </style>

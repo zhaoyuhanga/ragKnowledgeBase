@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 class RuntimeConfigData(BaseModel):
     """运行时配置数据模型（仅包含 DB 可管理的配置）"""
     retrieval_top_k: int = 5
-    similarity_threshold: float = 0.2
+    similarity_threshold: float = 0.5
     enable_mmr: bool = False
     mmr_diversity: float = 0.5
     chunk_size: int = 500

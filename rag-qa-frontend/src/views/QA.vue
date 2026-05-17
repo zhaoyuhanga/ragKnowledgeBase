@@ -10,7 +10,17 @@
       <div class="input-area">
         <el-input v-model="question" type="textarea" :rows="3" placeholder="请输入您的问题，例如..." :disabled="loading" @keyup.enter.ctrl="handleAsk" />
         <div class="input-actions">
-          <el-input-number v-model="topK" :min="1" :max="20" :step="1" controls-position="right" style="width: 120px"><template #prefix>Top K</template></el-input-number>
+          <div class="input-actions-left">
+            <el-input-number v-model="topK" :min="1" :max="20" :step="1" controls-position="right" style="width: 120px"><template #prefix>Top K</template></el-input-number>
+            <el-select v-model="searchMode" placeholder="搜索模式" style="width: 140px" :disabled="loading">
+              <el-option label="本地文档" value="local" />
+              <el-option label="AI 生成" value="ai_generated" />
+              <el-option label="全部" value="all" />
+            </el-select>
+            <el-tooltip content="检索为空时自动调用 AI 生成" placement="top">
+              <el-switch v-model="enableAiExtend" :disabled="loading" active-text="AI 扩展" />
+            </el-tooltip>
+          </div>
           <el-button type="primary" :loading="loading" :disabled="!question.trim()" @click="handleAsk">
             <el-icon v-if="!loading"><Search /></el-icon>
             提问
@@ -24,7 +34,10 @@
       <template #header>
         <div class="card-header">
           <span>回答（生成中...）</span>
-          <el-tag type="warning" size="small">流式生成</el-tag>
+          <el-tag v-if="isAiExtend" type="warning" size="small">
+            <el-icon><MagicStick /></el-icon> AI 扩展生成
+          </el-tag>
+          <el-tag v-else type="warning" size="small">流式生成</el-tag>
         </div>
       </template>
       <div class="answer-content markdown-content" v-html="renderedStreamedAnswer"></div>
@@ -36,7 +49,12 @@
         <div class="card-header">
           <span>回答</span>
           <div class="answer-meta">
-            <el-tag :type="currentAnswer.cache_hit ? 'warning' : 'success'" size="small">{{ currentAnswer.cache_hit ? '命中缓存' : '实时生成' }}</el-tag>
+            <el-tag v-if="isAiExtend" type="warning" size="small">
+              <el-icon><MagicStick /></el-icon> AI 扩展
+            </el-tag>
+            <el-tag v-else :type="currentAnswer.cache_hit ? 'success' : 'primary'" size="small">
+              {{ currentAnswer.cache_hit ? '命中缓存' : '实时生成' }}
+            </el-tag>
             <el-tag type="info" size="small">耗时: {{ currentAnswer.response_time_ms }}ms</el-tag>
           </div>
         </div>
@@ -44,7 +62,12 @@
       <div class="answer-content markdown-content" v-html="renderedAnswer"></div>
       <div class="sources-section" v-if="currentAnswer.sources && currentAnswer.sources.length > 0">
         <h4><el-icon><Link /></el-icon> 参考来源</h4>
-        <el-tag v-for="(source, index) in currentAnswer.sources" :key="index" type="info" class="source-tag">{{ source.filename }} (相似度: {{ (source.similarity * 100).toFixed(1) }}%)</el-tag>
+        <div class="sources-list">
+          <el-tag v-for="(source, index) in currentAnswer.sources" :key="index" class="source-tag" :type="source.source_type === 'ai_generated' ? 'warning' : 'info'">
+            <el-icon v-if="source.source_type === 'ai_generated'"><MagicStick /></el-icon>
+            {{ source.filename }} (相似度: {{ (source.similarity * 100).toFixed(1) }}%)
+          </el-tag>
+        </div>
       </div>
     </el-card>
 
@@ -58,7 +81,12 @@
       <template #header>
         <div class="card-header">
           <span>历史记录</span>
-          <el-button text size="small" @click="fetchHistory"><el-icon><Refresh /></el-icon>刷新</el-button>
+          <div class="history-actions">
+            <el-button text size="small" @click="handleClearCache" :loading="clearingCache">
+              <el-icon><Delete /></el-icon>清空缓存
+            </el-button>
+            <el-button text size="small" @click="fetchHistory"><el-icon><Refresh /></el-icon>刷新</el-button>
+          </div>
         </div>
       </template>
       <div v-if="history.length === 0" class="empty-state"><el-empty description="暂无历史记录" /></div>
@@ -67,6 +95,15 @@
           <div class="history-question">{{ item.question }}</div>
           <div class="history-meta">
             <span class="history-time">{{ formatTime(item.created_at) }}</span>
+            <!-- 来源类型标签 -->
+            <el-tag :type="item.source_type === 'ai_generated' ? 'warning' : 'primary'" size="small">
+              <el-icon v-if="item.source_type === 'ai_generated'"><MagicStick /></el-icon>
+              {{ item.source_type === 'ai_generated' ? 'AI生成' : '本地文档' }}
+            </el-tag>
+            <!-- 生成方式标签 -->
+            <el-tag :type="item.cache_hit ? 'success' : 'info'" size="small">
+              {{ item.cache_hit ? '缓存命中' : '实时生成' }}
+            </el-tag>
             <span class="history-meta-item">{{ item.response_time_ms }}ms</span>
           </div>
         </div>
@@ -82,14 +119,17 @@
 import { ref, computed, onMounted } from 'vue'
 import { marked } from 'marked'
 import { ElMessage } from 'element-plus'
-import { Search, Link, Refresh } from '@element-plus/icons-vue'
-import { askQuestion, getQAHistory } from '@/api'
+import { Search, Link, Refresh, MagicStick, Delete } from '@element-plus/icons-vue'
+import { askQuestion, getQAHistory, clearCache } from '@/api'
 import type { QAResponse, QAHistory } from '@/types'
 
 const question = ref('')
 const topK = ref(5)
+const searchMode = ref<'local' | 'ai_generated' | 'all'>('local')
+const enableAiExtend = ref(true)
 const loading = ref(false)
 const streaming = ref(false)
+const isAiExtend = ref(false)
 const currentAnswer = ref<QAResponse | null>(null)
 const streamedAnswer = ref('')
 const noResultMsg = ref('')
@@ -97,6 +137,7 @@ const history = ref<QAHistory[]>([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const historyTotal = ref(0)
+const clearingCache = ref(false)
 
 const renderedAnswer = computed(() => {
   if (!currentAnswer.value?.answer) return ''
@@ -124,6 +165,7 @@ const handleAsk = async () => {
   currentAnswer.value = null
   loading.value = true
   streaming.value = true
+  isAiExtend.value = false
 
   try {
     const token = localStorage.getItem('token')
@@ -137,6 +179,8 @@ const handleAsk = async () => {
       body: JSON.stringify({
         question: question.value,
         top_k: topK.value,
+        search_mode: searchMode.value,
+        enable_ai_extend: enableAiExtend.value,
       }),
     })
 
@@ -170,7 +214,6 @@ const handleAsk = async () => {
           if (event.type === 'token') {
             streamedAnswer.value += event.content
           } else if (event.type === 'sources') {
-            // sources 事件，仅在流式期间保留到 currentAnswer
             if (!currentAnswer.value) {
               currentAnswer.value = {
                 answer: '',
@@ -181,6 +224,8 @@ const handleAsk = async () => {
             } else {
               currentAnswer.value.sources = event.sources
             }
+          } else if (event.type === 'ai_extend') {
+            isAiExtend.value = true
           } else if (event.type === 'done') {
             currentAnswer.value = {
               answer: event.answer,
@@ -188,6 +233,7 @@ const handleAsk = async () => {
               cache_hit: event.cache_hit ?? false,
               response_time_ms: event.response_time_ms,
             }
+            isAiExtend.value = event.ai_extend ?? false
             streamedAnswer.value = ''
             noResultMsg.value = ''
             streaming.value = false
@@ -225,6 +271,20 @@ const fetchHistory = async () => {
   }
 }
 
+const handleClearCache = async () => {
+  try {
+    clearingCache.value = true
+    await clearCache()
+    ElMessage.success('缓存已清空')
+    fetchHistory()
+  } catch (error) {
+    console.error('Failed to clear cache:', error)
+    ElMessage.error('清空缓存失败')
+  } finally {
+    clearingCache.value = false
+  }
+}
+
 const loadHistoryItem = (item: QAHistory) => {
   noResultMsg.value = ''
   streamedAnswer.value = ''
@@ -241,13 +301,16 @@ onMounted(() => { fetchHistory() })
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .input-area { display: flex; flex-direction: column; gap: 16px; }
 .input-actions { display: flex; justify-content: space-between; align-items: center; }
+.input-actions-left { display: flex; gap: 12px; align-items: center; }
 .qa-result-card { margin-bottom: 20px; }
-.answer-meta { display: flex; gap: 8px; }
+.answer-meta { display: flex; gap: 8px; align-items: center; }
 .answer-content { padding: 20px; background: #f9fafb; border-radius: 8px; min-height: 100px; }
 .sources-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ebeef5; }
 .sources-section h4 { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #606266; }
-.source-tag { margin-right: 8px; margin-bottom: 8px; }
+.sources-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.source-tag { margin-bottom: 8px; }
 .history-card { margin-bottom: 20px; }
+.history-actions { display: flex; gap: 8px; }
 .history-list { max-height: 400px; overflow-y: auto; }
 .history-item { padding: 16px; border-bottom: 1px solid #ebeef5; cursor: pointer; transition: background-color 0.2s; }
 .history-item:hover { background-color: #f5f7fa; }

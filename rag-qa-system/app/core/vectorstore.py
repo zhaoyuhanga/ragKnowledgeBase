@@ -91,12 +91,20 @@ class VectorStore:
             FieldSchema(name="chunk_index", dtype=DataType.INT64),
             FieldSchema(name="content", dtype=DataType.VARCHAR, max_length=65535),
             FieldSchema(name="filename", dtype=DataType.VARCHAR, max_length=512),
+            # AI 生成相关字段
+            FieldSchema(name="source_type", dtype=DataType.VARCHAR, max_length=20),
+            FieldSchema(name="generated_from_question", dtype=DataType.VARCHAR, max_length=65535),
+            FieldSchema(name="generated_at", dtype=DataType.VARCHAR, max_length=64),
+            FieldSchema(name="llm_model", dtype=DataType.VARCHAR, max_length=100),
+            FieldSchema(name="llm_provider", dtype=DataType.VARCHAR, max_length=50),
+            # 向量字段
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=dim)
         ]
 
         schema = CollectionSchema(
             fields=fields,
-            description="Knowledge base vector collection"
+            description="Knowledge base vector collection",
+            enable_dynamic_field=True  # 支持动态字段
         )
 
         collection = Collection(name=collection_name, schema=schema)
@@ -130,39 +138,74 @@ class VectorStore:
         ids: List[str],
         metadatas: List[Dict[str, Any]] = None
     ) -> bool:
-        """添加向量到数据库"""
+        """添加向量到数据库
+        
+        Args:
+            documents: 文档内容列表
+            embeddings: 向量列表
+            ids: ID列表
+            metadatas: 元数据列表，支持以下字段:
+                - document_id: 文档ID
+                - chunk_index: 块序号
+                - filename: 文件名
+                - source_type: 来源类型 (local/ai_generated)
+                - generated_from_question: AI生成时的原始问题
+                - generated_at: AI生成时间
+                - llm_model: LLM模型
+                - llm_provider: LLM提供商
+        """
         try:
             logger.info(f"正在添加 {len(documents)} 个向量到 Milvus...")
 
             if metadatas is None:
                 metadatas = [{} for _ in range(len(documents))]
 
-            doc_ids_list = []
-            doc_id_list = []
-            chunk_idx_list = []
-            content_list = []
-            filename_list = []
-            embedding_list = []
+            # 获取 collection 的字段列表
+            schema_fields = {field.name for field in self.collection.schema.fields}
+            logger.debug(f"Collection 字段: {schema_fields}")
 
-            for i, doc_id in enumerate(ids):
-                metadata = metadatas[i] if i < len(metadatas) else {}
-                doc_ids_list.append(doc_id)
-                doc_id_list.append(metadata.get("document_id", 0))
-                chunk_idx_list.append(metadata.get("chunk_index", 0))
-                content_list.append(documents[i])
-                filename_list.append(metadata.get("filename", ""))
-                embedding_list.append(embeddings[i])
+            # 构建数据列表，只包含 collection 中存在的字段
+            data_dict = {}
+            
+            # 基础字段
+            if "id" in schema_fields:
+                data_dict["id"] = ids
+            if "document_id" in schema_fields:
+                data_dict["document_id"] = [metadatas[i].get("document_id", 0) if i < len(metadatas) else 0 for i in range(len(documents))]
+            if "chunk_index" in schema_fields:
+                data_dict["chunk_index"] = [metadatas[i].get("chunk_index", j) if i < len(metadatas) else j for i, j in enumerate(range(len(documents)))]
+            if "content" in schema_fields:
+                data_dict["content"] = documents
+            if "filename" in schema_fields:
+                data_dict["filename"] = [metadatas[i].get("filename", "") if i < len(metadatas) else "" for i in range(len(documents))]
+            
+            # AI 生成相关字段（可选，兼容旧 schema）
+            if "source_type" in schema_fields:
+                data_dict["source_type"] = [metadatas[i].get("source_type", "local") if i < len(metadatas) else "local" for i in range(len(documents))]
+            if "generated_from_question" in schema_fields:
+                data_dict["generated_from_question"] = [metadatas[i].get("generated_from_question", "") if i < len(metadatas) else "" for i in range(len(documents))]
+            if "generated_at" in schema_fields:
+                data_dict["generated_at"] = [metadatas[i].get("generated_at", "") if i < len(metadatas) else "" for i in range(len(documents))]
+            if "llm_model" in schema_fields:
+                data_dict["llm_model"] = [metadatas[i].get("llm_model", "") if i < len(metadatas) else "" for i in range(len(documents))]
+            if "llm_provider" in schema_fields:
+                data_dict["llm_provider"] = [metadatas[i].get("llm_provider", "") if i < len(metadatas) else "" for i in range(len(documents))]
+            
+            # 向量字段
+            if "embedding" in schema_fields:
+                data_dict["embedding"] = embeddings
 
-            data = [
-                doc_ids_list,
-                doc_id_list,
-                chunk_idx_list,
-                content_list,
-                filename_list,
-                embedding_list
-            ]
+            # 按照 schema 定义的顺序构建数据
+            data_list = []
+            field_names = []
+            for field in self.collection.schema.fields:
+                if field.name in data_dict:
+                    data_list.append(data_dict[field.name])
+                    field_names.append(field.name)
+            
+            logger.debug(f"插入数据包含 {len(data_list)} 个字段: {field_names}")
 
-            self.collection.insert(data)
+            self.collection.insert(data_list)
             self.collection.flush()
 
             logger.info(f"成功添加 {len(documents)} 个向量")
@@ -177,14 +220,24 @@ class VectorStore:
         query_embedding: List[float],
         n_results: int = None,
         where: Dict[str, Any] = None,
-        where_document: Dict[str, Any] = None
+        where_document: Dict[str, Any] = None,
+        source_type: str = None
     ) -> Dict[str, Any]:
-        """检索最相似的向量"""
+        """检索最相似的向量
+        
+        Args:
+            query_embedding: 查询向量
+            n_results: 返回数量
+            where: 过滤条件
+            where_document: 文档过滤条件
+            source_type: 来源类型过滤: local(本地导入) | ai_generated(AI生成) | None(全部)
+        """
         try:
             if n_results is None:
                 n_results = runtime_config.retrieval_top_k
 
-            logger.debug(f"正在检索向量，top_k={n_results}")
+            schema_fields = {field.name for field in self.collection.schema.fields}
+            logger.debug(f"正在检索向量，top_k={n_results}, source_type={source_type}, schema_fields={schema_fields}")
 
             search_params = {
                 "metric_type": settings.milvus_metric_type,
@@ -192,6 +245,8 @@ class VectorStore:
             }
 
             expr = None
+            
+            # 处理 document_id 过滤
             if where:
                 if "document_id" in where:
                     if isinstance(where["document_id"], dict):
@@ -202,6 +257,20 @@ class VectorStore:
                             expr = f"document_id == {where['document_id']['$eq']}"
                     else:
                         expr = f"document_id == {where['document_id']}"
+            
+            # 处理 source_type 过滤（仅当字段存在时）
+            if source_type and source_type != "all":
+                if "source_type" in schema_fields:
+                    source_expr = f'source_type == "{source_type}"'
+                    if expr:
+                        expr = f"({expr}) and {source_expr}"
+                    else:
+                        expr = source_expr
+                    logger.debug(f"使用 source_type 过滤: {source_expr}")
+                else:
+                    logger.warning(f"source_type 字段不存在于 schema，跳过过滤")
+            
+            logger.debug(f"最终查询表达式: {expr}")
 
             enable_mmr = runtime_config.enable_mmr
 
@@ -210,13 +279,18 @@ class VectorStore:
             else:
                 raw_limit = n_results
 
+            # 动态获取 output_fields
+            output_fields = ["id", "document_id", "chunk_index", "content", "filename"]
+            if "source_type" in schema_fields:
+                output_fields.extend(["source_type", "generated_from_question", "generated_at", "llm_model", "llm_provider"])
+
             results = self.collection.search(
                 data=[query_embedding],
                 anns_field="embedding",
                 param=search_params,
                 limit=raw_limit,
                 expr=expr,
-                output_fields=["id", "document_id", "chunk_index", "content", "filename"]
+                output_fields=output_fields
             )
 
             search_results = results[0] if results else []
@@ -242,13 +316,26 @@ class VectorStore:
                 for hit in reranked:
                     ids_list.append(hit.id)
                     distances_list.append(hit.distance)
-                    content = hit.get("content") or ""
+                    content = hit.get("content") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('content', '') or ""
                     docs_list.append(content)
+                    
+                    # 动态构建 metadata
                     metadata = {
-                        "document_id": hit.get("document_id"),
-                        "chunk_index": hit.get("chunk_index"),
-                        "filename": hit.get("filename")
+                        "document_id": hit.get("document_id") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('document_id'),
+                        "chunk_index": hit.get("chunk_index") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('chunk_index'),
+                        "filename": hit.get("filename") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('filename', ''),
                     }
+                    
+                    # AI 生成相关字段（仅当存在时添加）
+                    if "source_type" in schema_fields:
+                        metadata["source_type"] = hit.get("source_type") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('source_type', "local") or "local"
+                        metadata["generated_from_question"] = hit.get("generated_from_question") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('generated_from_question')
+                        metadata["generated_at"] = hit.get("generated_at") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('generated_at')
+                        metadata["llm_model"] = hit.get("llm_model") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('llm_model')
+                        metadata["llm_provider"] = hit.get("llm_provider") if hasattr(hit, 'get') else getattr(hit, 'entity', {}).get('llm_provider')
+                    else:
+                        metadata["source_type"] = "local"
+                    
                     metadatas_list.append(metadata)
 
                 processed_results = {
@@ -334,8 +421,10 @@ class VectorStore:
         try:
             if hasattr(hit, 'entity') and hasattr(hit.entity, 'embedding'):
                 return hit.entity.get('embedding')
-            if hasattr(hit, 'fields') and 'embedding' in hit.fields:
+            if hasattr(hit, 'get'):
                 return hit.get('embedding')
+            if hasattr(hit, 'fields') and 'embedding' in hit.fields:
+                return getattr(hit, 'embedding', None)
             return None
         except Exception:
             return None

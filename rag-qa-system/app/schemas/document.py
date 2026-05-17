@@ -44,6 +44,13 @@ class DocumentItem(BaseModel):
     chunk_count: int = Field(description="切分块数量")
     created_at: datetime = Field(description="创建时间")
     updated_at: datetime = Field(description="更新时间")
+    
+    # AI 生成相关字段
+    source_type: str = Field(default="local", description="来源类型: local(本地导入) | ai_generated(AI生成)")
+    generated_from_question: Optional[str] = Field(default=None, description="AI生成时的原始问题")
+    generated_at: Optional[datetime] = Field(default=None, description="AI生成时间")
+    llm_model: Optional[str] = Field(default=None, description="LLM模型")
+    llm_provider: Optional[str] = Field(default=None, description="LLM提供商")
 
     class Config:
         from_attributes = True
@@ -56,7 +63,12 @@ class DocumentItem(BaseModel):
                 "status": 1,
                 "chunk_count": 50,
                 "created_at": "2026-05-13T10:00:00",
-                "updated_at": "2026-05-13T10:00:30"
+                "updated_at": "2026-05-13T10:00:30",
+                "source_type": "local",
+                "generated_from_question": None,
+                "generated_at": None,
+                "llm_model": None,
+                "llm_provider": None
             }
         }
 
@@ -76,6 +88,13 @@ class DocumentDetailResponse(BaseModel):
     error_message: Optional[str] = Field(description="错误信息", default=None)
     created_at: datetime = Field(description="创建时间")
     updated_at: datetime = Field(description="更新时间")
+    
+    # AI 生成相关字段
+    source_type: str = Field(default="local", description="来源类型: local(本地导入) | ai_generated(AI生成)")
+    generated_from_question: Optional[str] = Field(default=None, description="AI生成时的原始问题")
+    generated_at: Optional[datetime] = Field(default=None, description="AI生成时间")
+    llm_model: Optional[str] = Field(default=None, description="LLM模型")
+    llm_provider: Optional[str] = Field(default=None, description="LLM提供商")
 
     class Config:
         from_attributes = True
@@ -91,7 +110,12 @@ class DocumentDetailResponse(BaseModel):
                 "chunk_count": 50,
                 "error_message": None,
                 "created_at": "2026-05-13T10:00:00",
-                "updated_at": "2026-05-13T10:00:30"
+                "updated_at": "2026-05-13T10:00:30",
+                "source_type": "local",
+                "generated_from_question": None,
+                "generated_at": None,
+                "llm_model": None,
+                "llm_provider": None
             }
         }
 
@@ -176,6 +200,13 @@ class ChunkItem(BaseModel):
     char_count: int = Field(description="字符数量")
     vector_id: Optional[str] = Field(description="向量 ID", default=None)
     created_at: datetime = Field(description="创建时间")
+    
+    # AI 生成相关字段
+    source_type: str = Field(default="local", description="来源类型: local(本地导入) | ai_generated(AI生成)")
+    generated_from_question: Optional[str] = Field(default=None, description="AI生成时的原始问题")
+    generated_at: Optional[datetime] = Field(default=None, description="AI生成时间")
+    llm_model: Optional[str] = Field(default=None, description="LLM模型")
+    llm_provider: Optional[str] = Field(default=None, description="LLM提供商")
 
     class Config:
         from_attributes = True
@@ -187,6 +218,11 @@ class ChunkItem(BaseModel):
                 "content": "这是文档的第一个文本块内容...",
                 "char_count": 500,
                 "vector_id": "1_0_a1b2c3d4",
-                "created_at": "2026-05-13T10:00:00"
+                "created_at": "2026-05-13T10:00:00",
+                "source_type": "local",
+                "generated_from_question": None,
+                "generated_at": None,
+                "llm_model": None,
+                "llm_provider": None
             }
         }

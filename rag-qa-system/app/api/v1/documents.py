@@ -116,12 +116,18 @@ async def upload_document(
     "",
     response_model=DataResponse[DocumentListResponse],
     summary="获取文档列表",
-    description="分页获取文档列表，支持按状态过滤。",
+    description="分页获取文档列表，支持按状态、来源类型、LLM模型等过滤。",
 )
 def get_documents(
     page: int = Query(default=1, ge=1, description="页码"),
     page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
     status: Optional[int] = Query(default=None, description="状态过滤: 0=处理中, 1=已完成, 2=失败"),
+    source_type: Optional[str] = Query(default=None, description="来源类型过滤: local(本地导入) | ai_generated(AI生成)"),
+    llm_model: Optional[str] = Query(default=None, description="LLM模型过滤"),
+    llm_provider: Optional[str] = Query(default=None, description="LLM提供商过滤"),
+    generated_at_start: Optional[str] = Query(default=None, description="AI生成时间开始 (ISO格式)"),
+    generated_at_end: Optional[str] = Query(default=None, description="AI生成时间结束 (ISO格式)"),
+    question_keyword: Optional[str] = Query(default=None, description="AI生成时的原始问题关键词"),
     db: Session = Depends(get_db),
 ):
     """
@@ -131,6 +137,12 @@ def get_documents(
     - `page`: 页码（默认 1）
     - `page_size`: 每页数量（默认 20，最大 100）
     - `status`: 状态过滤（可选）
+    - `source_type`: 来源类型过滤（可选）
+    - `llm_model`: LLM模型过滤（可选）
+    - `llm_provider`: LLM提供商过滤（可选）
+    - `generated_at_start`: AI生成时间开始（可选）
+    - `generated_at_end`: AI生成时间结束（可选）
+    - `question_keyword`: 原始问题关键词（可选）
     
     **出参说明：**
     - `items`: 文档列表
@@ -139,13 +151,29 @@ def get_documents(
     - `page_size`: 每页数量
     - `total_pages`: 总页数
     """
+    from datetime import datetime
+    
     skip = (page - 1) * page_size
+    
+    # 转换时间参数
+    gen_start = None
+    gen_end = None
+    if generated_at_start:
+        gen_start = datetime.fromisoformat(generated_at_start)
+    if generated_at_end:
+        gen_end = datetime.fromisoformat(generated_at_end)
     
     documents, total = document_service.get_document_list(
         db=db,
         skip=skip,
         limit=page_size,
         status=status,
+        source_type=source_type,
+        llm_model=llm_model,
+        llm_provider=llm_provider,
+        generated_at_start=gen_start,
+        generated_at_end=gen_end,
+        question_keyword=question_keyword,
     )
     
     return DataResponse(
@@ -162,6 +190,11 @@ def get_documents(
                     chunk_count=doc.chunk_count,
                     created_at=doc.created_at,
                     updated_at=doc.updated_at,
+                    source_type=doc.source_type,
+                    generated_from_question=doc.generated_from_question,
+                    generated_at=doc.generated_at,
+                    llm_model=doc.llm_model,
+                    llm_provider=doc.llm_provider,
                 )
                 for doc in documents
             ],
@@ -190,7 +223,7 @@ def get_document(
     - `document_id`: 文档 ID（路径参数）
     
     **出参说明：**
-    - 文档详细信息
+    - 文档详细信息（包括 AI 生成相关字段）
     """
     document = document_service.get_document(document_id, db)
     
@@ -212,6 +245,11 @@ def get_document(
             error_message=document.error_message,
             created_at=document.created_at,
             updated_at=document.updated_at,
+            source_type=document.source_type,
+            generated_from_question=document.generated_from_question,
+            generated_at=document.generated_at,
+            llm_model=document.llm_model,
+            llm_provider=document.llm_provider,
         )
     )
 
@@ -296,6 +334,11 @@ def get_document_chunks(
                 char_count=chunk.char_count,
                 vector_id=chunk.vector_id,
                 created_at=chunk.created_at,
+                source_type=chunk.source_type,
+                generated_from_question=chunk.generated_from_question,
+                generated_at=chunk.generated_at,
+                llm_model=chunk.llm_model,
+                llm_provider=chunk.llm_provider,
             )
             for chunk in chunks
         ]

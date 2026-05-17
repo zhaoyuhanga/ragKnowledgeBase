@@ -70,9 +70,9 @@ class Settings(BaseSettings):
     milvus_nlist: int = Field(default=1024, description="nlist 参数")
     
     # ============ Embedding 模型配置 ============
-    embedding_model: str = Field(default="sentence-transformers/all-MiniLM-L6-v2", description="Embedding 模型名称")
+    embedding_model: str = Field(default="moka-ai/m3e-base", description="Embedding 模型名称")
     embedding_device: str = Field(default="cpu", description="运行设备: cpu | cuda | mps")
-    embedding_dimension: int = Field(default=384, description="向量维度")
+    embedding_dimension: int = Field(default=768, description="向量维度")
     embedding_batch_size: int = Field(default=32, description="批量处理大小")
     
     # ============ 文件上传配置 ============

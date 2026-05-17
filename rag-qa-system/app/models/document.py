@@ -31,7 +31,7 @@ class Document(Base):
     # 文件存储路径
     file_path = Column(String(512), nullable=False, comment="文件存储路径")
     
-    # 文件类型 (pdf/md/txt/docx)
+    # 文件类型 (pdf/md/txt/docx/ai_generated)
     file_type = Column(String(50), nullable=False, comment="文件类型")
     
     # 文件大小（字节）
@@ -48,6 +48,22 @@ class Document(Base):
     
     # 错误信息
     error_message = Column(Text, nullable=True, comment="错误信息")
+    
+    # ============ AI 生成相关字段 ============
+    # 来源类型: local(本地导入) | ai_generated(AI生成)
+    source_type = Column(String(20), default="local", nullable=False, comment="来源类型")
+    
+    # AI 生成时记录原始问题
+    generated_from_question = Column(Text, nullable=True, comment="AI生成时的原始问题")
+    
+    # AI 生成时间
+    generated_at = Column(DateTime, nullable=True, comment="AI生成时间")
+    
+    # 使用的LLM模型
+    llm_model = Column(String(100), nullable=True, comment="LLM模型")
+    
+    # LLM提供商
+    llm_provider = Column(String(50), nullable=True, comment="LLM提供商")
     
     # 创建时间
     created_at = Column(DateTime, default=datetime.now, nullable=False, comment="创建时间")
@@ -66,10 +82,12 @@ class Document(Base):
     __table_args__ = (
         Index("idx_document_status", "status"),
         Index("idx_document_created", "created_at"),
+        Index("idx_document_source_type", "source_type"),
+        Index("idx_document_llm_model", "llm_model"),
     )
     
     def __repr__(self):
-        return f"<Document(id={self.id}, filename='{self.filename}', status={self.status})>"
+        return f"<Document(id={self.id}, filename='{self.filename}', source_type='{self.source_type}')>"
 
 
 class DocumentChunk(Base):
@@ -106,16 +124,33 @@ class DocumentChunk(Base):
     # 创建时间
     created_at = Column(DateTime, default=datetime.now, nullable=False, comment="创建时间")
     
+    # ============ AI 生成相关字段 ============
+    # 来源类型: local(本地导入) | ai_generated(AI生成)
+    source_type = Column(String(20), default="local", nullable=False, comment="来源类型")
+    
+    # AI 生成时记录原始问题
+    generated_from_question = Column(Text, nullable=True, comment="AI生成时的原始问题")
+    
+    # AI 生成时间
+    generated_at = Column(DateTime, nullable=True, comment="AI生成时间")
+    
+    # 使用的LLM模型
+    llm_model = Column(String(100), nullable=True, comment="LLM模型")
+    
+    # LLM提供商
+    llm_provider = Column(String(50), nullable=True, comment="LLM提供商")
+    
     # 关联的文档
     document: Mapped["Document"] = relationship("Document", back_populates="chunks")
     
     # 索引
     __table_args__ = (
         Index("idx_chunk_document_index", "document_id", "chunk_index"),
+        Index("idx_chunk_source_type", "source_type"),
     )
     
     def __repr__(self):
-        return f"<DocumentChunk(id={self.id}, document_id={self.document_id}, index={self.chunk_index})>"
+        return f"<DocumentChunk(id={self.id}, document_id={self.document_id}, source_type='{self.source_type}')>"
 
 
 class QALog(Base):
@@ -142,6 +177,9 @@ class QALog(Base):
     
     # 是否命中缓存
     cache_hit = Column(Boolean, default=False, nullable=False, comment="是否命中缓存")
+    
+    # 来源类型: local(本地文档) | ai_generated(AI生成)
+    source_type = Column(String(32), default="local", nullable=False, comment="来源类型: local/ai_generated")
     
     # 会话ID（用于多轮对话）
     session_id = Column(String(64), nullable=True, index=True, comment="会话ID")

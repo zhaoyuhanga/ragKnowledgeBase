@@ -34,6 +34,14 @@ class QAAskRequest(BaseModel):
         le=2.0,
         description="生成温度参数"
     )
+    search_mode: Optional[str] = Field(
+        default="local",
+        description="搜索模式: local(仅本地文档) | ai_generated(仅AI生成) | all(全部)"
+    )
+    enable_ai_extend: Optional[bool] = Field(
+        default=True,
+        description="是否启用AI扩展（检索为空时调用LLM生成）"
+    )
 
     class Config:
         json_schema_extra = {
@@ -41,7 +49,9 @@ class QAAskRequest(BaseModel):
                 "question": "什么是 RAG 技术？",
                 "session_id": "user_123_session_001",
                 "top_k": 5,
-                "temperature": 0.3
+                "temperature": 0.3,
+                "search_mode": "local",
+                "enable_ai_extend": True
             }
         }
 
@@ -55,6 +65,7 @@ class SourceItem(BaseModel):
     filename: str = Field(description="来源文件名")
     content: str = Field(description="来源文本内容（截取）")
     similarity: float = Field(description="相似度分数")
+    source_type: str = Field(default="local", description="来源类型: local(本地导入) | ai_generated(AI生成)")
 
     class Config:
         json_schema_extra = {
@@ -63,7 +74,8 @@ class SourceItem(BaseModel):
                 "document_id": 1,
                 "filename": "技术文档.pdf",
                 "content": "RAG（Retrieval-Augmented Generation）是检索增强生成的缩写...",
-                "similarity": 0.85
+                "similarity": 0.85,
+                "source_type": "local"
             }
         }
 
@@ -77,6 +89,8 @@ class QAAskResponse(BaseModel):
     cache_hit: bool = Field(description="是否命中缓存")
     response_time_ms: int = Field(description="响应耗时（毫秒）")
     error: Optional[str] = Field(description="错误信息", default=None)
+    ai_extend: bool = Field(default=False, description="是否启用AI扩展生成")
+    ai_doc_id: Optional[int] = Field(default=None, description="AI生成的文档ID")
 
     class Config:
         json_schema_extra = {
@@ -88,11 +102,14 @@ class QAAskResponse(BaseModel):
                         "document_id": 1,
                         "filename": "技术文档.pdf",
                         "content": "RAG（Retrieval-Augmented Generation）是检索增强生成的缩写...",
-                        "similarity": 0.85
+                        "similarity": 0.85,
+                        "source_type": "local"
                     }
                 ],
                 "cache_hit": False,
-                "response_time_ms": 1500
+                "response_time_ms": 1500,
+                "ai_extend": False,
+                "ai_doc_id": None
             }
         }
 
@@ -107,6 +124,7 @@ class QAHistoryItem(BaseModel):
     referenced_chunks: Optional[List[str]] = Field(description="引用的文档块 ID 列表（vector_id）")
     response_time_ms: Optional[int] = Field(description="响应耗时（毫秒）")
     cache_hit: bool = Field(description="是否命中缓存")
+    source_type: str = Field(default="local", description="来源类型: local/ai_generated")
     session_id: Optional[str] = Field(description="会话 ID")
     created_at: datetime = Field(description="创建时间")
 
@@ -115,13 +133,14 @@ class QAHistoryItem(BaseModel):
         json_schema_extra = {
             "example": {
                 "id": 1,
-                "question": "什么是 RAG 技术？",
-                "answer": "RAG 是检索增强生成的缩写...",
-                "referenced_chunks": [1, 2, 3],
+                "question": "什么是 RAG？",
+                "answer": "RAG 是检索增强生成...",
+                "referenced_chunks": ["1_0_abc123"],
                 "response_time_ms": 1500,
                 "cache_hit": False,
-                "session_id": "user_123_session_001",
-                "created_at": "2026-05-13T10:00:00"
+                "source_type": "local",
+                "session_id": "user_123",
+                "created_at": "2024-01-01T12:00:00"
             }
         }
 

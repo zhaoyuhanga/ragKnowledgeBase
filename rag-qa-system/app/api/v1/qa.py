@@ -96,7 +96,7 @@ async def ask_question(
 @router.post(
     "/ask/stream",
     summary="流式问答",
-    description="流式返回回答，边生成边推送，用户感知延迟更低。",
+    description="流式返回回答，边生成边推送。支持搜索模式切换和AI扩展。",
 )
 async def ask_question_stream(
     request: QAAskRequest,
@@ -110,15 +110,24 @@ async def ask_question_stream(
     **事件格式：**
     - `sources`: 检索到的参考来源（仅首次）
     - `token`: 每个 token 增量文本
+    - `ai_extend`: AI扩展状态
     - `done`: 完成，附带完整结果
     - `error`: 错误信息
 
+    **新增参数：**
+    - `search_mode`: 搜索模式 (local/ai_generated/all)
+    - `enable_ai_extend`: 是否启用AI扩展
+
     **前端处理示例：**
     ```javascript
-    const eventSource = new EventSource('/api/v1/qa/ask/stream', {
+    const response = await fetch('/api/v1/qa/ask/stream', {
       method: 'POST',
-      body: JSON.stringify({ question: '...' }),
-      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' }
+      body: JSON.stringify({ 
+        question: '...',
+        search_mode: 'local',
+        enable_ai_extend: true 
+      }),
+      headers: { 'Content-Type': 'application/json' }
     })
     ```
     """
@@ -129,6 +138,8 @@ async def ask_question_stream(
             session_id=request.session_id,
             top_k=request.top_k,
             temperature=request.temperature,
+            search_mode=request.search_mode or "local",
+            enable_ai_extend=request.enable_ai_extend if request.enable_ai_extend is not None else True,
         ),
         media_type="text/event-stream",
         headers={
@@ -187,6 +198,7 @@ def get_qa_history(
                     referenced_chunks=log.referenced_chunks,
                     response_time_ms=log.response_time_ms,
                     cache_hit=log.cache_hit,
+                    source_type=log.source_type,
                     session_id=log.session_id,
                     created_at=log.created_at,
                 )

@@ -184,13 +184,50 @@ class DocumentService:
         db: Session,
         skip: int = 0,
         limit: int = 20,
-        status: int = None
+        status: int = None,
+        source_type: str = None,
+        llm_model: str = None,
+        llm_provider: str = None,
+        generated_at_start=None,
+        generated_at_end=None,
+        question_keyword: str = None
     ) -> Tuple[List[Document], int]:
-        """获取文档列表"""
+        """获取文档列表
+        
+        Args:
+            db: 数据库会话
+            skip: 跳过数量
+            limit: 返回数量
+            status: 状态过滤
+            source_type: 来源类型过滤: local | ai_generated
+            llm_model: LLM模型过滤
+            llm_provider: LLM提供商过滤
+            generated_at_start: 生成时间开始
+            generated_at_end: 生成时间结束
+            question_keyword: 原始问题关键词
+        """
         query = db.query(Document)
 
         if status is not None:
             query = query.filter(Document.status == status)
+        
+        if source_type:
+            query = query.filter(Document.source_type == source_type)
+        
+        if llm_model:
+            query = query.filter(Document.llm_model == llm_model)
+        
+        if llm_provider:
+            query = query.filter(Document.llm_provider == llm_provider)
+        
+        if generated_at_start:
+            query = query.filter(Document.generated_at >= generated_at_start)
+        
+        if generated_at_end:
+            query = query.filter(Document.generated_at <= generated_at_end)
+        
+        if question_keyword:
+            query = query.filter(Document.generated_from_question.like(f"%{question_keyword}%"))
 
         total = query.count()
         documents = query.order_by(Document.created_at.desc()).offset(skip).limit(limit).all()
