@@ -2,6 +2,9 @@
 RAG 问答系统 - FastAPI 应用入口
 主应用配置文件
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import time
 from contextlib import asynccontextmanager
