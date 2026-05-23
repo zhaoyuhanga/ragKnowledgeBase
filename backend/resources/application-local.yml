@@ -1,0 +1,229 @@
+# ================================================
+# RAG知识库系统 - 本地开发环境配置
+# 环境：local
+# 说明：本地开发调试使用，敏感信息可使用默认值或本地环境变量
+# ================================================
+
+# 服务器配置
+server:
+  port: 8011
+  host: 127.0.0.1
+  reload: true
+  workers: 1
+
+# 数据库配置 - MySQL 8.0
+database:
+  host: localhost
+  port: 3308
+  username: root
+  password: "123456"
+  name: rag_db
+  charset: utf8mb4
+  pool_size: 5
+  max_overflow: 10
+  pool_recycle: 3600
+  echo: true
+
+# Redis配置
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+  decode_responses: true
+  socket_timeout: 5
+  socket_connect_timeout: 5
+
+# Milvus向量数据库配置
+milvus:
+  host: localhost
+  port: 19530
+  timeout: 30
+  pool_size: 10
+  alias: default
+
+# RabbitMQ消息队列配置
+rabbitmq:
+  host: localhost
+  port: 5672
+  username: guest
+  password: guest
+  virtual_host: /
+  heartbeat: 600
+  connection_timeout: 30
+  # 连接池配置 - 复用长连接，利用信道多路复用
+  pool_size: 5
+  max_channels_per_connection: 100
+  # 交换机配置
+  exchange:
+    name: rag_exchange
+    type: topic
+    durable: true
+  # 队列配置
+  queues:
+    parse_queue:
+      name: rag_parse_queue
+      routing_key: rag.parse.#
+      durable: true
+    clean_queue:
+      name: rag_clean_queue
+      routing_key: rag.clean.#
+      durable: true
+    chunk_queue:
+      name: rag_chunk_queue
+      routing_key: rag.chunk.#
+      durable: true
+    embedding_queue:
+      name: rag_embedding_queue
+      routing_key: rag.embedding.#
+      durable: true
+    index_queue:
+      name: rag_index_queue
+      routing_key: rag.index.#
+      durable: true
+  # 死信队列配置
+  dead_letter:
+    exchange: rag_dlx_exchange
+    queue: rag_dlx_queue
+    routing_key: dlx
+    durable: true
+
+# 应用配置
+app:
+  name: RAG知识库系统
+  version: 1.0.0
+  debug: true
+  env: local
+  description: RAG知识库系统后端API服务
+
+# 日志配置
+logging:
+  level: INFO
+  format: json
+  audit_enabled: true
+  file:
+    enabled: true
+    path: ./logs/app.log
+    max_bytes: 10485760
+    backup_count: 5
+  console:
+    enabled: true
+
+# CORS跨域配置
+cors:
+  enabled: true
+  allow_origins:
+    - http://localhost:3011
+    - http://127.0.0.1:3011
+  allow_methods:
+    - "*"
+  allow_headers:
+    - "*"
+  allow_credentials: true
+
+# API文档配置
+api:
+  title: RAG知识库系统API
+  description: 基于FastAPI的RAG知识库系统后端接口
+  version: 1.0.0
+  prefix: /api/v1
+  docs_url: /docs
+  redoc_url: /redoc
+
+# 文档解析配置
+document:
+  upload:
+    max_size: 104857600  # 100MB
+    allowed_extensions:
+      - pdf
+      - docx
+      - doc
+      - txt
+      - md
+      - html
+      - xlsx
+      - xls
+  storage:
+    base_path: ./data/uploads
+    temp_path: ./data/temp
+  parsing:
+    ocr_enabled: true
+    ocr_language: chn_sim
+    max_pages: 1000
+
+# 切分配置
+chunk:
+  target_tokens: 600
+  max_tokens: 900
+  min_tokens: 120
+  overlap_tokens: 100
+  semantic_threshold: 0.85
+
+# 向量化配置
+embedding:
+  model_name: qwen3-embedding:4b-q6
+  dimension: 1024
+  batch_size: 32
+  cache_enabled: true
+  cache_ttl: 86400
+  # Ollama 配置
+  use_ollama: true
+  ollama_host: http://localhost:11434
+  ollama_timeout: 120
+  ollama_retry_times: 3
+  fallback_to_mock: true
+
+# 检索配置
+retrieval:
+  vector_top_k: 100
+  keyword_top_k: 100
+  rrf_k: 60
+  fusion_top_k: 20
+  rerank_top_k: 10
+  vector_weight: 0.6
+  keyword_weight: 0.4
+
+# 查询改写配置
+query_rewrite:
+  enable_normalize: true
+  enable_multi_query: true
+  enable_subquery: true
+  enable_hyde: false
+  enable_background: false
+  use_llm: false
+  max_queries: 5
+  remove_stopwords: true
+
+# JWT认证配置
+jwt:
+  secret_key: local-dev-secret-key-change-in-production
+  algorithm: HS256
+  access_token_expire_minutes: 120
+  refresh_token_expire_days: 7
+
+# LLM配置
+llm:
+  provider: deepseek  # deepseek / openai / zhipu / qwen
+  api_key: "sk-ddec373703d64cd39fe0f97275866b13"
+  model_name: deepseek-v4-pro  # deepseek-chat / deepseek-coder / deepseek-v4-pro
+  base_url: https://api.deepseek.com
+  max_tokens: 4000
+  temperature: 0.7
+  timeout: 120
+
+# 缓存配置
+cache:
+  embedding:
+    ttl: 86400
+    max_size: 10000
+  query:
+    ttl: 3600
+    max_size: 5000
+
+# 视觉模型配置
+vision:
+  model_name: qwen2.5-ocr
+  ollama_host: http://localhost:11434
+  timeout: 180
+  retry_times: 3
+  enabled: true
