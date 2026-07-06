@@ -1,0 +1,87 @@
+# ================================================
+# Python
+# ================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# 虚拟环境
+venv/
+.venv/
+env/
+
+# ================================================
+# 环境变量 / Secrets（禁止提交到仓库）
+# ================================================
+.env
+.env.*
+!.env.example
+
+# 配置文件（覆盖 application-*.yml 的真实值）
+backend/resources/application-local.yml
+backend/resources/application-prod.yml
+
+# ================================================
+# 上传文件 / 运行时数据 / 日志
+# ================================================
+backend/data/
+backend/src/data/
+backend/logs/
+logs/
+*.log
+!docs/**/*.log
+
+# 解析上传测试样本
+**/uploads/**/*.docx
+**/uploads/**/*.pdf
+**/uploads/**/*.xlsx
+
+# 数据文档脚本（参考性资料，按团队约定保留 README）
+# data-docs/          # 暂保留以防影响外层引用，未来按需调整
+
+# ================================================
+# 前端（Vite + React + Ant Design）
+# ================================================
+node_modules/
+**/node_modules/
+
+# 构建产物
+dist/
+build/
+.vite/
+.turbo/
+.cache/
+
+# 调试/本地
+.DS_Store
+Thumbs.db
+*.local
+*.swp
+.idea/
+.vscode/
+!.vscode/settings.json.example
+
+# ================================================
+# Docker / 容器调试
+# ================================================
+docker/volumes/
+*.pid
+
+# ================================================
+# 杂项
+# ================================================
+*.bak
+*.tmp
+*.swp
+.DS_Store

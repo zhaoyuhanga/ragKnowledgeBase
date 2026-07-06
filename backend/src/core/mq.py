@@ -81,7 +81,8 @@ class RabbitMQConnectionPool:
         self._username = username or settings.rabbitmq.username
         self._password = password or settings.rabbitmq.password
         self._virtual_host = virtual_host or settings.rabbitmq.virtual_host
-        self._pool_size = pool_size or settings.rabbitmq.get("pool_size", 5)
+        # 注意：settings.rabbitmq 是 pydantic BaseModel，没有 .get() 方法，必须直接访问属性
+        self._pool_size = pool_size or settings.rabbitmq.pool_size
         self._heartbeat = heartbeat
         self._connection_timeout = connection_timeout
         

@@ -12,7 +12,7 @@ services:
     ports:
       - "3308:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_ROOT_PASSWORD: 123456
       MYSQL_DATABASE: rag_db
       MYSQL_USER: rag_user
       MYSQL_PASSWORD: rag_password
@@ -27,7 +27,7 @@ services:
     networks:
       - rag-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123456"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
       interval: 10s
       timeout: 5s
       retries: 5
