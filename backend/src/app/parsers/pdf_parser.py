@@ -343,6 +343,9 @@ class PdfParser(BaseParser):
         """
         解析扫描版PDF页面
 
+        流程：页面转图像 → 图像预处理 → OCR 识别（Tesseract/EasyOCR）→ 生成元素。
+        若 OCR 全部不可用或识别为空，则保留低置信度占位标记供后续复核。
+
         Args:
             page: PDF页面对象
             page_no: 页码
@@ -355,20 +358,15 @@ class PdfParser(BaseParser):
         elements = []
 
         try:
-            # 1. 页面转图像
-            mat = fitz.Matrix(2, 2)  # 2x倍率提高清晰度
+            # 1. 页面转图像（2x倍率提高清晰度）
+            mat = fitz.Matrix(2, 2)
             pix = page.get_pixmap(matrix=mat)
             image_bytes = pix.tobytes("png")
 
-            # 2. 图像预处理
-            processed_image = self._preprocess_image(image_bytes)
-
-            # 3. 简单文本提取（使用PyMuPDF内置OCR或返回图像信息）
-            # 实际OCR需要调用外部OCR服务
+            # 2. 先尝试文本层（混合型PDF可能部分页面有文本）
             text = page.get_text().strip()
 
             if text:
-                # 如果有文本，使用文本内容
                 elements.append(DocumentElementModel(
                     element_id=self._generate_element_id(),
                     document_id=document_id,
@@ -381,8 +379,39 @@ class PdfParser(BaseParser):
                     confidence=0.9,
                     quality_flag=QualityFlag.GOOD
                 ))
+                return elements
+
+            # 3. 无文本层：图像预处理 + 真实OCR
+            # 复用 ImageParser 的预处理/OCR 链路（pytesseract → EasyOCR → 空）
+            from app.parsers.image_parser import ImageParser
+            image_parser = ImageParser()
+            processed_image = image_parser._preprocess_image(image_bytes)
+            ocr_text, ocr_confidence = image_parser._perform_ocr(processed_image)
+
+            if ocr_text:
+                # 根据置信度标记质量
+                if ocr_confidence >= 0.8:
+                    quality_flag = QualityFlag.GOOD
+                elif ocr_confidence >= 0.5:
+                    quality_flag = QualityFlag.WARNING
+                else:
+                    quality_flag = QualityFlag.BAD
+
+                elements.append(DocumentElementModel(
+                    element_id=self._generate_element_id(),
+                    document_id=document_id,
+                    version_id=version_id,
+                    page_no=page_no + 1,
+                    element_type=ElementType.PARAGRAPH,
+                    content=ocr_text,
+                    enhanced_content=ocr_text,
+                    reading_order=0,
+                    confidence=ocr_confidence or 0.5,
+                    quality_flag=quality_flag,
+                    metadata={"ocr": True, "ocr_engine": "tesseract/easyocr"}
+                ))
             else:
-                # 无文本，标记为需要OCR
+                # OCR不可用或识别为空，保留占位标记供人工复核
                 elements.append(DocumentElementModel(
                     element_id=self._generate_element_id(),
                     document_id=document_id,
@@ -394,7 +423,7 @@ class PdfParser(BaseParser):
                     reading_order=0,
                     confidence=0.5,
                     quality_flag=QualityFlag.WARNING,
-                    metadata={"ocr_required": True}
+                    metadata={"ocr_required": True, "ocr_failed": True}
                 ))
 
         except Exception as e:

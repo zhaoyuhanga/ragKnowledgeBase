@@ -54,12 +54,16 @@ class QueueConsumer(ABC):
         self._is_running = False
         self._lock = threading.Lock()
 
+        # 幂等标记 TTL：任务处理完成后保留该时长，用于拦截重复投递（默认7天）
+        self._idempotency_ttl = 7 * 24 * 3600
+
         # 统计信息
         self._stats = {
             "consumed_total": 0,
             "success_total": 0,
             "failed_total": 0,
             "retry_total": 0,
+            "duplicate_total": 0,
         }
 
     @abstractmethod
@@ -177,14 +181,15 @@ class QueueConsumer(ABC):
         """设置工作队列"""
         queue_name = self._config.queue_name
 
-        # 直接声明队列，让 RabbitMQ 自动处理
+        # 直接声明队列，让 RabbitMQ 自动处理（支持优先级）
         try:
             self._channel.queue_declare(
                 queue=queue_name,
                 durable=True,
                 arguments={
                     "x-dead-letter-exchange": "rag_dlx_exchange",
-                    "x-dead-letter-routing-key": "dlx"
+                    "x-dead-letter-routing-key": "dlx",
+                    "x-max-priority": settings.rabbitmq.max_priority
                 }
             )
             logger.info(
@@ -282,6 +287,20 @@ class QueueConsumer(ABC):
                 }
             )
 
+            # 幂等检查：任务已处理成功过则直接确认，避免重复消费
+            task_id = message.get("task_id")
+            if task_id and self._is_processed(task_id):
+                self._stats["duplicate_total"] += 1
+                channel.basic_ack(delivery_tag=delivery_tag)
+                logger.info(
+                    f"检测到已处理过的重复消息，直接确认",
+                    extra={
+                        "worker_name": self._config.worker_name,
+                        "task_id": task_id
+                    }
+                )
+                return
+
             # 检查是否超过最大重试次数
             retry_count = message.get("retry_count", 0)
             max_retry = message.get("max_retry", self._config.max_retry)
@@ -308,6 +327,10 @@ class QueueConsumer(ABC):
             if success:
                 channel.basic_ack(delivery_tag=delivery_tag)
                 self._stats["success_total"] += 1
+
+                # 处理成功后写入幂等标记（失败重试不受影响，仍会重新处理）
+                if task_id:
+                    self._mark_processed(task_id)
 
                 cost_time = int((time.time() - start_time) * 1000)
                 logger.info(
@@ -342,6 +365,58 @@ class QueueConsumer(ABC):
 
         except Exception as e:
             self._handle_failure(channel, method, properties, None, e)
+
+    def _is_processed(self, task_id: str) -> bool:
+        """
+        检查任务是否已处理成功（幂等检查）
+
+        通过 Redis SET NX 实现：任务处理成功时会写入标记，
+        后续重复投递（同一 task_id）将命中标记被跳过。
+
+        Args:
+            task_id: 任务ID
+
+        Returns:
+            是否已处理过
+        """
+        try:
+            from core.cache import get_redis_client
+            client = get_redis_client()
+            # SET NX：键不存在时返回 True（首次），存在时返回 None（重复）
+            return not client.set(
+                f"mq:consumed:{task_id}",
+                "1",
+                nx=True,
+                ex=self._idempotency_ttl
+            )
+        except Exception as e:
+            # Redis 不可用时降级为不拦截（至少一次投递语义兜底）
+            logger.warning(
+                f"幂等检查失败（Redis不可用），跳过去重: {str(e)}",
+                extra={"task_id": task_id}
+            )
+            return False
+
+    def _mark_processed(self, task_id: str) -> None:
+        """
+        标记任务为已处理成功（幂等标记写入）
+
+        Args:
+            task_id: 任务ID
+        """
+        try:
+            from core.cache import get_redis_client
+            client = get_redis_client()
+            client.set(
+                f"mq:consumed:{task_id}",
+                "1",
+                ex=self._idempotency_ttl
+            )
+        except Exception as e:
+            logger.warning(
+                f"写入幂等标记失败（Redis不可用）: {str(e)}",
+                extra={"task_id": task_id}
+            )
 
     def _handle_failure(
         self,
@@ -1139,10 +1214,14 @@ class RabbitMQClientWrapper:
                 self.connect()
 
             if properties is None:
-                properties = pika.BasicProperties(
-                    delivery_mode=2,
-                    content_type="application/json"
-                )
+                props_kwargs = {
+                    "delivery_mode": 2,
+                    "content_type": "application/json"
+                }
+                priority = message.get("priority")
+                if isinstance(priority, int) and 0 <= priority <= settings.rabbitmq.max_priority:
+                    props_kwargs["priority"] = priority
+                properties = pika.BasicProperties(**props_kwargs)
 
             self._channel.basic_publish(
                 exchange=self._exchange_name,

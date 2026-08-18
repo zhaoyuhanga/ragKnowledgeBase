@@ -11,6 +11,7 @@
 
 import hashlib
 import os
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -20,6 +21,25 @@ from typing import Optional
 from app.common.exception import BusinessException, ErrorCode
 from app.common.logging import logger
 from core.config import settings
+
+
+# 业务归属ID允许的字符（UUID/数字/短横线/下划线），防止目录穿越
+_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _safe_basename(name: str) -> str:
+    """
+    仅保留文件名部分，去除所有路径分隔符（兼容 / 和 \\），防止目录穿越。
+
+    Args:
+        name: 原始文件名
+
+    Returns:
+        安全的文件名
+    """
+    base = (name or "").replace("\\", "/").rsplit("/", 1)[-1]
+    # 去除控制字符，仅保留可打印字符
+    return "".join(ch for ch in base if ch.isprintable()).strip()
 
 
 # 支持的文件类型映射
@@ -106,6 +126,11 @@ class FileStorageService:
         self._temp_path = Path(settings.document.storage.temp_path)
         self._max_size = settings.document.upload.max_size
         self._allowed_extensions = set(SUPPORTED_TYPES)
+
+    @property
+    def max_size(self) -> int:
+        """最大文件大小（字节）"""
+        return self._max_size
 
     def _ensure_directory(self, directory: Path) -> None:
         """
@@ -257,11 +282,22 @@ class FileStorageService:
             # 获取MIME类型
             mime_type = MIME_TYPE_MAP.get(doc_type, "application/octet-stream")
 
-            # 生成存储文件名
-            stored_name = f"{uuid.uuid4().hex}_{file_hash[:8]}_{original_name}"
+            # 生成存储文件名（original_name 只取文件名部分，防止目录穿越）
+            safe_name = _safe_basename(original_name)
+            if not safe_name:
+                raise BusinessException(
+                    code=ErrorCode.PARAM_INVALID[0],
+                    message="文件名无效"
+                )
+            stored_name = f"{uuid.uuid4().hex}_{file_hash[:8]}_{safe_name}"
 
-            # 确定存储目录
+            # 确定存储目录（business_id 仅允许安全字符，防止目录穿越）
             if business_id:
+                if not _SAFE_ID_RE.match(business_id):
+                    raise BusinessException(
+                        code=ErrorCode.PARAM_INVALID[0],
+                        message=f"业务归属ID包含非法字符: {business_id!r}"
+                    )
                 storage_dir = self._base_path / business_id
             else:
                 storage_dir = self._base_path / "default"
@@ -270,6 +306,15 @@ class FileStorageService:
 
             # 完整存储路径
             storage_path = storage_dir / stored_name
+
+            # 防御性校验：最终路径必须位于存储根目录内
+            base_resolved = self._base_path.resolve()
+            final_resolved = storage_path.resolve()
+            if not str(final_resolved).startswith(str(base_resolved)):
+                raise BusinessException(
+                    code=ErrorCode.PARAM_INVALID[0],
+                    message="存储路径非法"
+                )
 
             # 保存文件
             with open(storage_path, "wb") as f:

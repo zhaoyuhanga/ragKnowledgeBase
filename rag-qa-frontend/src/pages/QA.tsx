@@ -12,7 +12,6 @@ import {
   Col,
   message,
   Tabs,
-  Table,
   Rate,
   Modal,
   Descriptions,
@@ -32,8 +31,6 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import {
-  askQuestion,
-  askQuestionStream,
   submitFeedback,
   getQALogs,
   getQALogDetail,
@@ -42,6 +39,7 @@ import {
 } from '../services/qa';
 import type { QALogItem, QAFeedbackStatistics, QASession, QAResponseData, QALogDetailData } from '../types/api';
 import { BASE_URL as API_BASE_URL } from '../services/api';
+import { AppTable } from '../components';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -184,7 +182,7 @@ const QA: React.FC = () => {
 
   // 流式问答处理
   const handleStreamQuestion = async (question: string, messageId: number) => {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve) => {
       const fullContent: string[] = [];
       let qaId: number | undefined;
       let references: QAResponseData['references'] = [];
@@ -240,9 +238,10 @@ const QA: React.FC = () => {
                 } else if (data.qa_id && data.retrieval_time_ms !== undefined) {
                   // 元数据事件
                   qaId = data.qa_id;
+                  const currentQaId = qaId as number;
                   // 获取引用信息
                   try {
-                    const detailRes = await getQALogDetail(qaId);
+                    const detailRes = await getQALogDetail(currentQaId);
                     if (detailRes.code === 0 && detailRes.data) {
                       references = detailRes.data.references || [];
                     }
@@ -443,10 +442,9 @@ const QA: React.FC = () => {
       dataIndex: 'feedback',
       key: 'feedback',
       width: 100,
-      render: (feedback: number) => (
-        feedback === 1 ? <Tag color="success">满意</Tag> :
-        feedback === 0 ? <Tag color="error">不满意</Tag> : '-'
-      ),
+      render: (feedback: number | string) =>
+        feedback === 1 || feedback === 'helpful' ? <Tag color="success">满意</Tag> :
+        feedback === 0 || feedback === 'not_helpful' ? <Tag color="error">不满意</Tag> : '-',
     },
     {
       title: '评分',
@@ -685,7 +683,7 @@ const QA: React.FC = () => {
       ),
       children: (
         <Card bordered={false}>
-          <Table
+          <AppTable
             columns={logsColumns}
             dataSource={qaLogs}
             rowKey="id"

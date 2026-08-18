@@ -130,7 +130,7 @@ class TestCleanService:
 
     def test_apply_cleaning_rules_delete(self):
         """测试正则删除规则"""
-        text = "这是第1页的内容"
+        text = "第1页"  # 页眉页脚规则按整行锚定（^...$）
         context = CleaningContext(document_id=1, version_id=1)
 
         # 添加页眉删除规则
@@ -145,9 +145,10 @@ class TestCleanService:
             )
         ]
 
-        cleaned, applied = self.service._apply_cleaning_rules(text, context)
+        cleaned, applied, rule_hits = self.service._apply_cleaning_rules(text, context)
         assert "第1页" not in cleaned
         assert "页眉清洗" in applied
+        assert rule_hits and rule_hits[0]["rule_id"] == 1
 
     def test_apply_cleaning_rules_replace(self):
         """测试正则替换规则"""
@@ -166,9 +167,10 @@ class TestCleanService:
             )
         ]
 
-        cleaned, applied = self.service._apply_cleaning_rules(text, context)
+        cleaned, applied, rule_hits = self.service._apply_cleaning_rules(text, context)
         assert "    " not in cleaned
         assert "空白归一化" in applied
+        assert rule_hits and rule_hits[0]["rule_type"] == "regex_replace"
 
     def test_clean_element_full_pipeline(self):
         """测试完整清洗流程"""

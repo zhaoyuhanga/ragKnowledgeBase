@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
-  Table,
   Button,
   Space,
   Input,
@@ -21,6 +20,7 @@ import {
   Alert
 } from 'antd';
 import type { UploadProps, TablePaginationConfig } from 'antd';
+import { AppTable } from '../components';
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -501,7 +501,7 @@ const Documents: React.FC = () => {
         </Row>
 
         {/* 文档列表 */}
-        <Table
+        <AppTable
           columns={columns}
           dataSource={documents}
           rowKey="id"
@@ -649,7 +649,7 @@ const Documents: React.FC = () => {
                 key: 'versions',
                 label: '版本历史',
                 children: (
-                  <Table
+                  <AppTable
                     columns={versionColumns}
                     dataSource={versions}
                     rowKey="id"

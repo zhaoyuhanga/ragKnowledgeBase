@@ -10,9 +10,11 @@ __pycache__/
 *.egg-info/
 .eggs/
 .pytest_cache/
+pytest-cache-files-*/
 .coverage
 .coverage.*
 htmlcov/
+coverage.xml
 .mypy_cache/
 .ruff_cache/
 
@@ -63,11 +65,15 @@ build/
 .turbo/
 .cache/
 
+# npm 缓存
+.npm-cache/
+
 # 调试/本地
 .DS_Store
 Thumbs.db
 *.local
 *.swp
+*.swo
 .idea/
 .vscode/
 !.vscode/settings.json.example
@@ -76,7 +82,17 @@ Thumbs.db
 # Docker / 容器调试
 # ================================================
 docker/volumes/
+docker/data/
 *.pid
+
+# ================================================
+# 冒烟测试临时文件（桩模块与测试脚本）
+# ================================================
+_smoke_stubs/
+_smoke_test.py
+_e2e_test.py
+.pip-tmp/
+backend/data/e2e_test.txt
 
 # ================================================
 # 杂项

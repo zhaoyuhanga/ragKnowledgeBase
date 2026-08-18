@@ -866,6 +866,10 @@ class ParseService:
         }
 
         # 步骤3: 清洗文档
+        # cleaning_succeeded / cleaned_elements 用于把清洗结果（清洗后文本 + 质量评分）
+        # 传递给切分阶段，使 document_chunks.quality_score 能真实落库
+        cleaning_succeeded = False
+        cleaned_elements = None
         if enable_cleaning:
             logger.info("步骤2: 清洗文档...")
             try:
@@ -875,6 +879,8 @@ class ParseService:
                     version_id=actual_version_id,
                     elements=elements
                 )
+                cleaning_succeeded = True
+                cleaned_elements = clean_result.elements
                 result["stages"]["cleaning"] = {
                     "status": "completed",
                     "cleaned_count": clean_result.success_count,
@@ -915,7 +921,8 @@ class ParseService:
                 chunk_result = chunk_service.chunk_document(
                     document_id=document_id,
                     version_id=actual_version_id,
-                    elements=elements
+                    elements=elements,
+                    cleaned_elements=cleaned_elements if cleaning_succeeded else None
                 )
 
                 # 保存chunks到数据库

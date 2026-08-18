@@ -97,7 +97,7 @@ python -m uvicorn src.main:app --host 127.0.0.1 --port 8011 --reload
 | ----------- | ------------------------------------------------------------ |
 | API 文档      | [http://127.0.0.1:8011/docs](http://127.0.0.1:8011/docs)     |
 | ReDoc 文档    | [http://127.0.0.1:8011/redoc](http://127.0.0.1:8011/redoc)   |
-| 健康检查        | [http://127.0.0.1:8011/health](http://127.0.0.1:8011/health) |
+| 健康检查        | [http://127.0.0.1:8011/api/v1/health](http://127.0.0.1:8011/api/v1/health) |
 | RabbitMQ 管理 | [http://localhost:15672](http://localhost:15672)             |
 | Milvus 管理   | [http://localhost:9091](http://localhost:9091)               |
 
@@ -106,7 +106,7 @@ python -m uvicorn src.main:app --host 127.0.0.1 --port 8011 --reload
 
 ```bash
 # 健康检查
-curl http://127.0.0.1:8011/health
+curl http://127.0.0.1:8011/api/v1/health
 
 # 文档列表
 curl http://127.0.0.1:8011/api/v1/documents

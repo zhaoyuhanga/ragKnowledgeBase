@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 import numpy as np
 
+from app.common.exception import BusinessException, ErrorCode
 from app.common.logging import logger
 from core.config import settings
 
@@ -550,16 +551,31 @@ class OllamaRerankClient:
         if self._is_available is None:
             self.health_check()
 
-        if self._is_available and not self._fallback_to_mock:
-            # 尝试使用 Ollama
+        if self._is_available:
+            # Ollama 可用：优先使用真实重排序
             try:
                 return self._rerank_with_ollama(query, documents, top_n, return_documents)
             except Exception as e:
-                logger.warning(f"Ollama Rerank 调用失败: {str(e)}，使用 Mock 评分")
-                return self._rerank_with_mock(query, documents, top_n, return_documents)
+                logger.warning(
+                    f"Ollama Rerank 调用失败: {str(e)}",
+                    extra={"host": self._host, "model": self._model_name, "error": str(e)}
+                )
+                if self._fallback_to_mock:
+                    logger.warning(f"降级使用 Mock 评分", extra={"host": self._host})
+                    return self._rerank_with_mock(query, documents, top_n, return_documents)
+                raise
         else:
-            # 使用 Mock 评分
-            return self._rerank_with_mock(query, documents, top_n, return_documents)
+            # Ollama 不可用
+            if self._fallback_to_mock:
+                logger.warning(
+                    f"Ollama Rerank 不可用，使用 Mock 评分",
+                    extra={"host": self._host, "fallback_to_mock": True}
+                )
+                return self._rerank_with_mock(query, documents, top_n, return_documents)
+            raise BusinessException(
+                code=ErrorCode.RERANK_FAILED[0],
+                message=f"Ollama Rerank 服务不可用，且未启用 Mock 降级"
+            )
 
     def _rerank_with_ollama(
         self,

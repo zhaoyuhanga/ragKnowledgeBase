@@ -27,8 +27,9 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
   return (
     <Card
       bordered={false}
+      className="stat-card"
       style={{
-        borderRadius: 8,
+        borderRadius: 12,
         boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
       }}
       styles={{ body: { padding: '20px 24px' } }}
@@ -46,12 +47,12 @@ const StatisticCard: React.FC<StatisticCardProps> = ({
           style={{
             width: 56,
             height: 56,
-            borderRadius: 8,
+            borderRadius: 12,
             background: `${color}15`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 28,
+            fontSize: 26,
             color: color,
           }}
         >

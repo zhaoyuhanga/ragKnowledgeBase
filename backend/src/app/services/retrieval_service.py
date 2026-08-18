@@ -55,15 +55,20 @@ class RetrievalService:
 
     @property
     def fusion_service(self) -> FusionService:
-        """获取融合服务实例"""
+        """获取融合服务实例（融合权重支持由优化规则动态覆盖）"""
         if self._fusion_service is None:
+            # 读取已启用的检索权重优化规则（如 feedback 闭环产出的 adjust_fusion_weight），
+            # 无生效规则时回退到 settings 静态配置
+            from app.services.optimization_engine import get_effective_fusion_weights
+            weights = get_effective_fusion_weights(tenant_id=1)
+
             config = FusionConfig(
                 vector_top_k=settings.retrieval.vector_top_k,
                 keyword_top_k=settings.retrieval.keyword_top_k,
                 rrf_k=settings.retrieval.rrf_k,
                 fusion_top_k=settings.retrieval.fusion_top_k,
-                vector_weight=settings.retrieval.vector_weight,
-                keyword_weight=settings.retrieval.keyword_weight,
+                vector_weight=weights["vector_weight"] if weights else settings.retrieval.vector_weight,
+                keyword_weight=weights["keyword_weight"] if weights else settings.retrieval.keyword_weight,
             )
             self._fusion_service = get_fusion_service(config)
         return self._fusion_service

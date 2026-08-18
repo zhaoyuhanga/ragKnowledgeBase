@@ -11,7 +11,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, Query
 from pydantic import BaseModel
 
 from app.common.logging import logger
@@ -26,7 +26,7 @@ from app.repositories.milvus_repository import (
 )
 from core.cache import get_embedding_cache
 
-router = APIRouter(prefix="/embedding", tags=["向量化服务"])
+router = APIRouter(tags=["向量化服务"])
 
 
 # ================================================
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/embedding", tags=["向量化服务"])
 # ================================================
 
 @router.post("/encode", response_model=BaseModel)
-async def encode_texts(texts: list[str]):
+async def encode_texts(texts: list[str] = Body(..., description="待向量化的文本列表")):
     """
     批量文本向量化
 
@@ -60,7 +60,7 @@ async def encode_texts(texts: list[str]):
 
 
 @router.post("/encode/single", response_model=BaseModel)
-async def encode_single_text(text: str):
+async def encode_single_text(text: str = Body(..., description="待向量化的文本")):
     """
     单个文本向量化
 
@@ -92,8 +92,8 @@ async def encode_single_text(text: str):
 @router.post("/chunks/{document_id}", response_model=BaseModel)
 async def embed_document_chunks(
     document_id: int,
-    version_id: Optional[int] = None,
-    use_cache: bool = True
+    version_id: Optional[int] = Body(None, description="版本ID"),
+    use_cache: bool = Body(True, description="是否使用缓存")
 ):
     """
     向量化文档Chunks
@@ -158,9 +158,9 @@ async def embed_document_chunks(
 
 @router.post("/search", response_model=BaseModel)
 async def search_vectors(
-    query: str,
-    top_k: int = Query(default=10, ge=1, le=100, description="返回结果数量"),
-    document_ids: Optional[str] = Query(default=None, description="文档ID列表，逗号分隔")
+    query: str = Body(..., description="查询文本"),
+    top_k: int = Body(10, ge=1, le=100, description="返回结果数量"),
+    document_ids: Optional[str] = Body(None, description="文档ID列表，逗号分隔")
 ):
     """
     向量检索

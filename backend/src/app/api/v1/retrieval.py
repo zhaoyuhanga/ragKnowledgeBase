@@ -15,7 +15,7 @@
 import time
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 
 from app.common.response import success_response
 from app.schemas.retrieval import (
@@ -67,9 +67,9 @@ async def hybrid_search(
 
 @router.post("/vector")
 async def vector_search(
-    query: str = Query(..., description="查询文本"),
-    top_k: int = Query(10, ge=1, le=100, description="返回数量"),
-    doc_ids: Optional[List[int]] = Query(None, description="限定文档ID列表"),
+    query: str = Body(..., description="查询文本"),
+    top_k: int = Body(10, ge=1, le=100, description="返回数量"),
+    doc_ids: Optional[List[int]] = Body(None, description="限定文档ID列表"),
     service: RetrievalService = Depends(get_retrieval_service)
 ):
     """
@@ -91,9 +91,9 @@ async def vector_search(
 
 @router.post("/keyword")
 async def keyword_search(
-    query: str = Query(..., description="查询文本"),
-    top_k: int = Query(10, ge=1, le=100, description="返回数量"),
-    doc_ids: Optional[List[int]] = Query(None, description="限定文档ID列表"),
+    query: str = Body(..., description="查询文本"),
+    top_k: int = Body(10, ge=1, le=100, description="返回数量"),
+    doc_ids: Optional[List[int]] = Body(None, description="限定文档ID列表"),
     service: RetrievalService = Depends(get_retrieval_service)
 ):
     """

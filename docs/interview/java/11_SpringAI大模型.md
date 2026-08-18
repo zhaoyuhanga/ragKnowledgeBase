@@ -19,14 +19,16 @@ Spring AI是Spring生态提供的AI工程化框架，旨在简化AI应用的开�
 
 **核心特点：**
 
-| 特性 | 说明 |
-|------|------|
-| 多模型支持 | OpenAI、Azure OpenAI、Anthropic、HuggingFace等 |
-| 统一API | 抽象层统一接口，易于切换模型 |
-| Prompt工程 | 丰富的Prompt模板和参数配置 |
-| 结构化输出 | 支持POJO映射 |
-| RAG支持 | 文档处理、向量化、检索增强 |
-| 向量存储 | 集成多种向量数据库 |
+
+| 特性       | 说明                                         |
+| -------- | ------------------------------------------ |
+| 多模型支持    | OpenAI、Azure OpenAI、Anthropic、HuggingFace等 |
+| 统一API    | 抽象层统一接口，易于切换模型                             |
+| Prompt工程 | 丰富的Prompt模板和参数配置                           |
+| 结构化输出    | 支持POJO映射                                   |
+| RAG支持    | 文档处理、向量化、检索增强                              |
+| 向量存储     | 集成多种向量数据库                                  |
+
 
 **架构图：**
 
@@ -68,11 +70,13 @@ Spring AI是Spring生态提供的AI工程化框架，旨在简化AI应用的开�
 
 **与其他方案对比：**
 
-| 方案 | 优点 | 缺点 |
-|------|------|------|
-| Spring AI | 统一API、Spring生态集成、丰富的RAG支持 | 相对较新 |
-| LangChain4j | 功能丰富、社区活跃 | 学习曲线 |
-| 直接SDK | 灵活 | 需要自己处理很多细节 |
+
+| 方案          | 优点                        | 缺点         |
+| ----------- | ------------------------- | ---------- |
+| Spring AI   | 统一API、Spring生态集成、丰富的RAG支持 | 相对较新       |
+| LangChain4j | 功能丰富、社区活跃                 | 学习曲线       |
+| 直接SDK       | 灵活                        | 需要自己处理很多细节 |
+
 
 ---
 
@@ -86,12 +90,14 @@ Spring AI是Spring生态提供的AI工程化框架，旨在简化AI应用的开�
 
 **支持模型类型：**
 
-| 类型 | 支持的模型 | Starter依赖 |
-|------|------------|-------------|
-| 对话模型 | OpenAI GPT, Claude, Azure OpenAI, Cohere | openai-spring-boot-starter |
-| 嵌入模型 | OpenAI Ada, HuggingFace, Azure | embedding-openai-spring-boot-starter |
-| 图像模型 | OpenAI DALL-E, Stable Diffusion | openai-spring-boot-starter |
-| 音频模型 | OpenAI Whisper | openai-spring-boot-starter |
+
+| 类型   | 支持的模型                                    | Starter依赖                            |
+| ---- | ---------------------------------------- | ------------------------------------ |
+| 对话模型 | OpenAI GPT, Claude, Azure OpenAI, Cohere | openai-spring-boot-starter           |
+| 嵌入模型 | OpenAI Ada, HuggingFace, Azure           | embedding-openai-spring-boot-starter |
+| 图像模型 | OpenAI DALL-E, Stable Diffusion          | openai-spring-boot-starter           |
+| 音频模型 | OpenAI Whisper                           | openai-spring-boot-starter           |
+
 
 **OpenAI集成：**
 
@@ -762,16 +768,18 @@ public class RagService {
 
 **支持的向量数据库：**
 
-| 数据库 | 依赖 | 说明 |
-|--------|------|------|
-| PostgreSQL + PGVector | spring-ai-pgvector | 成熟稳定 |
-| Milvus | spring-ai-milvus | 国产高性能 |
-| Pinecone | spring-ai-pinecone | 云原生 |
-| Weaviate | spring-ai-weaviate | 混合搜索 |
-| Qdrant | spring-ai-qdrant | 高性能 |
-| Redis | spring-ai-redis | 使用RedisVL |
-| Chroma | spring-ai-chroma | 轻量级 |
-| Neo4j | spring-ai-neo4j | 知识图谱 |
+
+| 数据库                   | 依赖                 | 说明        |
+| --------------------- | ------------------ | --------- |
+| PostgreSQL + PGVector | spring-ai-pgvector | 成熟稳定      |
+| Milvus                | spring-ai-milvus   | 国产高性能     |
+| Pinecone              | spring-ai-pinecone | 云原生       |
+| Weaviate              | spring-ai-weaviate | 混合搜索      |
+| Qdrant                | spring-ai-qdrant   | 高性能       |
+| Redis                 | spring-ai-redis    | 使用RedisVL |
+| Chroma                | spring-ai-chroma   | 轻量级       |
+| Neo4j                 | spring-ai-neo4j    | 知识图谱      |
+
 
 **PGVector集成：**
 
@@ -1482,13 +1490,15 @@ public class AIUsageAudit {
 
 **Spring AI核心知识点：**
 
-| 类别 | 关键知识点 |
-|------|----------|
-| 基础 | ChatClient、PromptTemplate、Function Calling、ChatMemory |
-| RAG | 文档切分、向量存储、混合检索、Query改写 |
-| 多模态 | 图像理解、图像生成 |
-| 集成 | OpenAI、Azure、Cohere、多向量数据库 |
-| 实战 | 流式输出、测试、安全 |
+
+| 类别  | 关键知识点                                                 |
+| --- | ----------------------------------------------------- |
+| 基础  | ChatClient、PromptTemplate、Function Calling、ChatMemory |
+| RAG | 文档切分、向量存储、混合检索、Query改写                                |
+| 多模态 | 图像理解、图像生成                                             |
+| 集成  | OpenAI、Azure、Cohere、多向量数据库                            |
+| 实战  | 流式输出、测试、安全                                            |
+
 
 ---
 

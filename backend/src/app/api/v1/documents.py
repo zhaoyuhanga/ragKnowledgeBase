@@ -36,6 +36,7 @@ async def upload_document(
     business_name: Optional[str] = Form(None, description="业务归属名称"),
     creator_id: Optional[int] = Form(None, description="创建人ID"),
     creator_name: Optional[str] = Form(None, description="创建人姓名"),
+    overwrite: bool = Form(False, description="是否覆盖同名文档（同名且业务归属相同时复用文档并创建新版本）"),
     service: DocumentService = Depends(get_document_service)
 ):
     """
@@ -43,6 +44,7 @@ async def upload_document(
 
     上传单个文档文件，自动识别文件类型并保存。
     如果文件已存在（通过Hash检测），则关联到已有版本。
+    overwrite=True 时，若存在同名文档（同业务归属），复用该文档并创建新版本。
 
     Args:
         file: 上传的文件
@@ -50,6 +52,7 @@ async def upload_document(
         business_name: 业务归属名称
         creator_id: 创建人ID
         creator_name: 创建人姓名
+        overwrite: 是否覆盖同名文档
 
     Returns:
         上传结果，包含文档ID、版本ID等信息
@@ -59,7 +62,8 @@ async def upload_document(
         business_id=business_id,
         business_name=business_name,
         creator_id=creator_id,
-        creator_name=creator_name
+        creator_name=creator_name,
+        overwrite=overwrite
     )
     return success_response(data=result, message=result.get("message", "上传成功"))
 
@@ -71,6 +75,7 @@ async def batch_upload_documents(
     business_name: Optional[str] = Form(None, description="业务归属名称"),
     creator_id: Optional[int] = Form(None, description="创建人ID"),
     creator_name: Optional[str] = Form(None, description="创建人姓名"),
+    overwrite: bool = Form(False, description="是否覆盖同名文档（同名且业务归属相同时复用文档并创建新版本）"),
     service: DocumentService = Depends(get_document_service)
 ):
     """
@@ -85,6 +90,7 @@ async def batch_upload_documents(
         business_name: 业务归属名称
         creator_id: 创建人ID
         creator_name: 创建人姓名
+        overwrite: 是否覆盖同名文档
 
     Returns:
         批量上传结果，包含成功数、失败数、重复数等统计
@@ -94,7 +100,8 @@ async def batch_upload_documents(
         business_id=business_id,
         business_name=business_name,
         creator_id=creator_id,
-        creator_name=creator_name
+        creator_name=creator_name,
+        overwrite=overwrite
     )
     return success_response(data=result, message="批量上传完成")
 

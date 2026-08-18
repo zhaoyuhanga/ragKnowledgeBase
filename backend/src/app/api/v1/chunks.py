@@ -10,11 +10,11 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, Query
 from pydantic import BaseModel
 
 from app.common.logging import logger
-from app.common.response import success_response, error_response
+from app.common.response import page_response, success_response, error_response
 from app.models.chunk import DocumentChunk
 from app.models.document import Document, DocumentVersion
 from app.schemas.chunk import (
@@ -28,7 +28,7 @@ from app.schemas.chunk import (
 )
 from app.services.chunk_service import get_chunk_service
 
-router = APIRouter(prefix="/chunks", tags=["切分服务"])
+router = APIRouter(tags=["切分服务"])
 
 
 # ================================================
@@ -38,8 +38,8 @@ router = APIRouter(prefix="/chunks", tags=["切分服务"])
 @router.post("/documents/{document_id}", response_model=BaseModel)
 async def chunk_document(
     document_id: int,
-    version_id: Optional[int] = None,
-    config: Optional[ChunkConfigRequest] = None
+    version_id: Optional[int] = Body(None, description="版本ID（可选，默认使用最新版本）"),
+    config: Optional[ChunkConfigRequest] = Body(None, description="切分配置（可选，使用默认配置）")
 ):
     """
     切分文档
@@ -312,12 +312,13 @@ async def list_document_chunks(
                 created_at=chunk["created_at"]
             ))
 
-        return success_response(data={
-            "items": [item.model_dump() for item in items],
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }, message="获取Chunk列表成功")
+        return page_response(
+            items=[item.model_dump() for item in items],
+            total=total,
+            page_no=page,
+            page_size=page_size,
+            message="获取Chunk列表成功"
+        )
 
     except Exception as e:
         logger.error(f"获取Chunk列表失败: {str(e)}")

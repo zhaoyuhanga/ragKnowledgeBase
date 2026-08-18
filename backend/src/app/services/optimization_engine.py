@@ -18,6 +18,70 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.common.logging import logger
 
 
+def get_effective_fusion_weights(tenant_id: int = 1) -> Optional[Dict[str, float]]:
+    """
+    读取已生效的检索权重优化规则
+
+    查询状态为「已启用」的 retrieval 类型优化规则，返回最新生效的融合权重
+    （vector_weight / keyword_weight）。没有生效规则时返回 None，由调用方回退到静态配置。
+
+    Args:
+        tenant_id: 租户ID
+
+    Returns:
+        {"vector_weight": float, "keyword_weight": float} 或 None
+    """
+    try:
+        from app.models.feedback import OptimizationRule
+        from core.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            rule = (
+                db.query(OptimizationRule)
+                .filter(
+                    OptimizationRule.rule_type == OptimizationRule.RULE_TYPE_RETRIEVAL,
+                    OptimizationRule.status == OptimizationRule.STATUS_ENABLED,
+                    OptimizationRule.tenant_id == tenant_id,
+                )
+                .order_by(OptimizationRule.updated_at.desc())
+                .first()
+            )
+            if not rule:
+                return None
+
+            config = json.loads(rule.rule_config or "{}")
+            vector_weight = config.get("vector_weight")
+            keyword_weight = config.get("keyword_weight")
+
+            if (
+                isinstance(vector_weight, (int, float))
+                and isinstance(keyword_weight, (int, float))
+                and vector_weight >= 0
+                and keyword_weight >= 0
+            ):
+                logger.info(
+                    f"检索权重规则生效",
+                    extra={
+                        "rule_id": rule.id,
+                        "rule_name": rule.rule_name,
+                        "vector_weight": float(vector_weight),
+                        "keyword_weight": float(keyword_weight)
+                    }
+                )
+                return {
+                    "vector_weight": float(vector_weight),
+                    "keyword_weight": float(keyword_weight)
+                }
+            return None
+        finally:
+            db.close()
+    except Exception as e:
+        # 读取失败不阻断检索，回退静态配置
+        logger.warning(f"读取检索权重规则失败，回退静态配置: {str(e)}")
+        return None
+
+
 @dataclass
 class TriggerCondition:
     """触发条件"""

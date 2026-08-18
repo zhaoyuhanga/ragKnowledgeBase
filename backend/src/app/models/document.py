@@ -115,7 +115,8 @@ class DocumentVersion(Base):
     version = Column(Integer, nullable=False, comment="版本号")
 
     # 文件哈希
-    file_hash = Column(String(64), nullable=False, comment="文件MD5哈希值")
+    # 唯一索引防止并发上传相同文件时重复入库（与版本去重策略一致）
+    file_hash = Column(String(64), nullable=False, unique=True, comment="文件MD5哈希值")
 
     # 原始文件名
     file_name = Column(String(255), nullable=False, comment="原始文件名")

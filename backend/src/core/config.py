@@ -118,6 +118,7 @@ class RabbitMQConfig(BaseModel):
     connection_timeout: int = Field(default=30, description="连接超时(秒)")
     pool_size: int = Field(default=5, description="连接池大小")
     max_channels_per_connection: int = Field(default=100, description="每个连接最大信道数")
+    max_priority: int = Field(default=10, description="队列最大优先级（x-max-priority，1-255）")
     exchange: RabbitMQExchangeConfig = Field(default_factory=RabbitMQExchangeConfig)
     queues: Dict[str, RabbitMQQueueConfig] = Field(default_factory=dict)
     dead_letter: RabbitMQDeadLetterConfig = Field(default_factory=RabbitMQDeadLetterConfig)

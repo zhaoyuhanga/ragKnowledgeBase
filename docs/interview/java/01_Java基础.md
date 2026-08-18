@@ -16,18 +16,21 @@
 
 **四类八种数据类型：**
 
-| 数据类型 | 关键字 | 字节数 | 位数 | 默认值 | 取值范围 |
-|---------|--------|--------|------|--------|----------|
-| 整型 | byte | 1 | 8 | 0 | -128 ~ 127 |
-| 整型 | short | 2 | 16 | 0 | -32768 ~ 32767 |
-| 整型 | int | 4 | 32 | 0 | -2^31 ~ 2^31-1 |
-| 整型 | long | 8 | 64 | 0L | -2^63 ~ 2^63-1 |
-| 浮点型 | float | 4 | 32 | 0.0f | ±3.4E38 |
-| 浮点型 | double | 8 | 64 | 0.0d | ±1.7E308 |
-| 字符型 | char | 2 | 16 | '\u0000' | 0 ~ 65535 |
-| 布尔型 | boolean | 1 | 8 | false | true/false |
+
+| 数据类型 | 关键字     | 字节数 | 位数  | 默认值      | 取值范围           |
+| ---- | ------- | --- | --- | -------- | -------------- |
+| 整型   | byte    | 1   | 8   | 0        | -128 ~ 127     |
+| 整型   | short   | 2   | 16  | 0        | -32768 ~ 32767 |
+| 整型   | int     | 4   | 32  | 0        | -2^31 ~ 2^31-1 |
+| 整型   | long    | 8   | 64  | 0L       | -2^63 ~ 2^63-1 |
+| 浮点型  | float   | 4   | 32  | 0.0f     | ±3.4E38        |
+| 浮点型  | double  | 8   | 64  | 0.0d     | ±1.7E308       |
+| 字符型  | char    | 2   | 16  | '\u0000' | 0 ~ 65535      |
+| 布尔型  | boolean | 1   | 8   | false    | true/false     |
+
 
 **注意事项：**
+
 - String是引用类型，不是基本数据类型
 - 整型默认是int，浮点型默认是double
 - char使用Unicode编码，可以存储中文
@@ -43,11 +46,13 @@
 **答案要点**：
 
 **== 操作符：**
+
 - 比较的是两个对象的引用地址（内存地址）
 - 对于基本数据类型，比较的是值
 - 引用类型比较的是堆内存地址
 
 **equals() 方法：**
+
 - 是Object类的方法，默认实现和`==`相同
 - 可以被重写实现自定义比较逻辑
 - String类重写了equals()，比较内容而非地址
@@ -71,6 +76,7 @@ System.out.println(c == d);         // false，超出缓存范围
 ```
 
 **最佳实践：**
+
 - 比较String内容使用equals()
 - 比较包装类型值使用equals()
 - 避免使用==比较字符串
@@ -87,12 +93,14 @@ System.out.println(c == d);         // false，超出缓存范围
 
 **核心区别：**
 
-| 特性 | String | StringBuilder | StringBuffer |
-|------|--------|--------------|--------------|
-| 可变性 | 不可变 | 可变 | 可变 |
-| 线程安全 | 安全（不可变） | 不安全 | 安全（synchronized） |
-| 性能 | 每次修改创建新对象 | 高 | 中等 |
-| 使用场景 | 字符串常量 | 单线程字符串拼接 | 多线程字符串操作 |
+
+| 特性   | String    | StringBuilder | StringBuffer     |
+| ---- | --------- | ------------- | ---------------- |
+| 可变性  | 不可变       | 可变            | 可变               |
+| 线程安全 | 安全（不可变）   | 不安全           | 安全（synchronized） |
+| 性能   | 每次修改创建新对象 | 高             | 中等               |
+| 使用场景 | 字符串常量     | 单线程字符串拼接      | 多线程字符串操作         |
+
 
 **源码分析：**
 
@@ -111,11 +119,13 @@ sbf.append("a").append("b").append("c");
 ```
 
 **性能对比：**
+
 - String: O(n²) 时间复杂度（每次创建新对象）
 - StringBuilder: O(n) 时间复杂度
 - StringBuffer: O(n) 时间复杂度（有同步开销）
 
 **使用建议：**
+
 - 字符串常量用String
 - 单线程字符串拼接用StringBuilder
 - 多线程字符串操作用StringBuffer
@@ -132,12 +142,14 @@ sbf.append("a").append("b").append("c");
 
 **四种访问修饰符：**
 
-| 修饰符 | 同类 | 同包 | 子类 | 不同包 |
-|--------|------|------|------|--------|
-| private | ✓ | ✗ | ✗ | ✗ |
-| default(无修饰) | ✓ | ✓ | ✗ | ✗ |
-| protected | ✓ | ✓ | ✓ | ✗ |
-| public | ✓ | ✓ | ✓ | ✓ |
+
+| 修饰符          | 同类  | 同包  | 子类  | 不同包 |
+| ------------ | --- | --- | --- | --- |
+| private      | ✓   | ✗   | ✗   | ✗   |
+| default(无修饰) | ✓   | ✓   | ✗   | ✗   |
+| protected    | ✓   | ✓   | ✓   | ✗   |
+| public       | ✓   | ✓   | ✓   | ✓   |
+
 
 **详细说明：**
 
@@ -164,6 +176,7 @@ public class AccessModifiers {
 ```
 
 **最佳实践：**
+
 - 成员变量尽量private
 - 提供public的getter/setter方法
 - 只在需要被继承时使用protected
@@ -179,6 +192,7 @@ public class AccessModifiers {
 **答案要点**：
 
 **定义区分：**
+
 - **值传递**：传递参数的副本，修改不影响原值
 - **引用传递**：传递参数的引用地址，修改会影响原值
 
@@ -206,6 +220,7 @@ System.out.println(sb.toString());  // "hello world"
 ```
 
 **关键理解：**
+
 - Java总是传递值的副本
 - 对于引用类型，副本是指向对象的地址
 - 在方法内重新赋值引用参数，不会影响原引用
@@ -258,15 +273,17 @@ public class Child extends Parent {
 
 **核心区别：**
 
-| 区别 | 重载 | 重写 |
-|------|------|------|
-| 发生位置 | 同一个类 | 父类和子类 |
-| 方法名 | 必须相同 | 必须相同 |
-| 参数列表 | 必须不同 | 必须相同 |
-| 返回类型 | 可以不同 | 必须兼容 |
-| 访问修饰符 | 可以不同 | 不能更严格 |
-| 异常处理 | 可以不同 | 不能抛出新异常 |
-| 关键字 | 无要求 | @Override |
+
+| 区别    | 重载   | 重写        |
+| ----- | ---- | --------- |
+| 发生位置  | 同一个类 | 父类和子类     |
+| 方法名   | 必须相同 | 必须相同      |
+| 参数列表  | 必须不同 | 必须相同      |
+| 返回类型  | 可以不同 | 必须兼容      |
+| 访问修饰符 | 可以不同 | 不能更严格     |
+| 异常处理  | 可以不同 | 不能抛出新异常   |
+| 关键字   | 无要求  | @Override |
+
 
 ---
 
@@ -304,6 +321,7 @@ public final class FinalClass {
 ```
 
 **应用场景：**
+
 - 定义常量：`public static final double PI = 3.14159`
 - 防止方法被重写：如Object类的getClass()
 - 防止类被继承：如String、Integer等
@@ -347,11 +365,13 @@ public class StaticDemo {
 ```
 
 **执行顺序：**
+
 ```
 静态变量/代码块 → 构造代码块 → 构造函数
 ```
 
 **注意事项：**
+
 - 静态方法不能访问非静态成员
 - 静态方法不能使用this/super
 - 静态变量是线程共享的，需要注意线程安全
@@ -368,15 +388,17 @@ public class StaticDemo {
 
 **核心区别对比：**
 
-| 特性 | 抽象类 | 接口 |
-|------|--------|------|
-| 关键字 | abstract class | interface |
-| 继承/实现 | extends（单继承） | implements（多实现） |
-| 方法 | 可以有抽象和普通方法 | JDK7：全是抽象；JDK8+：default/static |
-| 变量 | 可以有任何类型 | 只能是public static final |
-| 构造方法 | 可以有 | 不能有 |
-| 静态方法 | 可以有 | JDK8+可以有 |
-| 使用场景 | "是什么"关系 | "能做什么"关系 |
+
+| 特性    | 抽象类            | 接口                             |
+| ----- | -------------- | ------------------------------ |
+| 关键字   | abstract class | interface                      |
+| 继承/实现 | extends（单继承）   | implements（多实现）                |
+| 方法    | 可以有抽象和普通方法     | JDK7：全是抽象；JDK8+：default/static |
+| 变量    | 可以有任何类型        | 只能是public static final         |
+| 构造方法  | 可以有            | 不能有                            |
+| 静态方法  | 可以有            | JDK8+可以有                       |
+| 使用场景  | "是什么"关系        | "能做什么"关系                       |
+
 
 **代码示例：**
 
@@ -420,6 +442,7 @@ class Penguin extends Animal implements Swimmable {
 ```
 
 **JDK8+接口新特性：**
+
 ```java
 interface Calculator {
     // 抽象方法
@@ -451,6 +474,7 @@ interface Calculator {
 同一类型的引用指向不同对象时，表现出不同的行为特征。
 
 **多态的三个必要条件：**
+
 1. 继承（或有实现关系）
 2. 重写
 3. 父类引用指向子类对象
@@ -492,10 +516,12 @@ public class Test {
 ```
 
 **多态的两种形式：**
+
 1. **编译时多态（静态绑定）**：方法重载
 2. **运行时多态（动态绑定）**：方法重写
 
 **向上转型与向下转型：**
+
 ```java
 // 向上转型 - 自动转换
 Animal animal = new Dog();  // 子类转父类
@@ -561,15 +587,18 @@ public class ReflectionDemo {
 
 **应用场景：**
 
-| 场景 | 说明 |
-|------|------|
-| Spring IOC | 通过反射创建和管理Bean |
-| JDBC | 加载驱动，创建Connection |
-| 注解处理器 | 读取和处理注解 |
-| 序列化 | 如Jackson、Gson的ObjectMapper |
-| 框架通用性 | 通用处理不同类型的对象 |
+
+| 场景         | 说明                         |
+| ---------- | -------------------------- |
+| Spring IOC | 通过反射创建和管理Bean              |
+| JDBC       | 加载驱动，创建Connection          |
+| 注解处理器      | 读取和处理注解                    |
+| 序列化        | 如Jackson、Gson的ObjectMapper |
+| 框架通用性      | 通用处理不同类型的对象                |
+
 
 **反射的优缺点：**
+
 - 优点：灵活、可扩展、通用性强
 - 缺点：性能损耗、安全检查、破坏封装性
 
@@ -602,11 +631,13 @@ public @interface MyAnnotation {
 
 **生命周期对比：**
 
-| RetentionPolicy | 说明 | 使用场景 |
-|-----------------|------|----------|
-| SOURCE | 只在源代码中 | @Override、@SuppressWarnings |
-| CLASS | 编译时保留 | Lombok等字节码增强 |
-| RUNTIME | 运行时常驻 | Spring注解、数据库映射 |
+
+| RetentionPolicy | 说明     | 使用场景                        |
+| --------------- | ------ | --------------------------- |
+| SOURCE          | 只在源代码中 | @Override、@SuppressWarnings |
+| CLASS           | 编译时保留  | Lombok等字节码增强                |
+| RUNTIME         | 运行时常驻  | Spring注解、数据库映射              |
+
 
 **注解处理器示例：**
 
@@ -640,6 +671,7 @@ public class AnnotationProcessor {
 ```
 
 **常见框架注解：**
+
 - Spring: @Component, @Service, @Autowired, @RequestMapping
 - JPA: @Entity, @Table, @Column, @Id
 - MyBatis: @Select, @Insert, @Update, @Delete
@@ -658,6 +690,7 @@ public class AnnotationProcessor {
 一种参数化类型机制，允许在定义类、接口、方法时使用类型参数。
 
 **使用泛型的原因：**
+
 1. 编译时类型检查
 2. 避免类型转换
 3. 代码复用
@@ -699,11 +732,13 @@ String value = stringBox.getContent();
 
 **泛型通配符：**
 
-| 通配符 | 说明 | 特点 |
-|--------|------|------|
-| <?> | 无限制通配符 | 可以接收任何类型 |
-| <? extends T> | 上界通配符 | 只能读取（T的子类） |
-| <? super T> | 下界通配符 | 只能写入（T的父类） |
+
+| 通配符           | 说明     | 特点         |
+| ------------- | ------ | ---------- |
+| <?>           | 无限制通配符 | 可以接收任何类型   |
+| <? extends T> | 上界通配符  | 只能读取（T的子类） |
+| <? super T>   | 下界通配符  | 只能写入（T的父类） |
+
 
 ```java
 // PECS原则：Producer-Extends, Consumer-Super
@@ -719,6 +754,7 @@ public void write(List<? super Integer> list) {
 ```
 
 **类型擦除：**
+
 - 泛型信息在编译时会被擦除
 - 运行时无法获取泛型类型信息
 - 需要通过TypeToken等方式保留泛型信息
@@ -784,6 +820,7 @@ try (FileInputStream fis = new FileInputStream("file.txt");
 ```
 
 **注意事项：**
+
 1. finally块始终执行，即使try/catch中有return
 2. 如果finally中有return，会覆盖try/catch中的return
 3. 抛出异常时，先执行finally再抛出
@@ -800,12 +837,14 @@ try (FileInputStream fis = new FileInputStream("file.txt");
 
 **核心区别：**
 
-| 区别 | throw | throws |
-|------|-------|--------|
-| 作用位置 | 方法内部 | 方法签名 |
-| 含义 | 抛出异常对象 | 声明可能抛出的异常 |
-| 数量 | 一次抛出一个 | 声明多个可能抛出的异常 |
-| 类型 | Throwable对象 | 异常类型 |
+
+| 区别   | throw       | throws      |
+| ---- | ----------- | ----------- |
+| 作用位置 | 方法内部        | 方法签名        |
+| 含义   | 抛出异常对象      | 声明可能抛出的异常   |
+| 数量   | 一次抛出一个      | 声明多个可能抛出的异常 |
+| 类型   | Throwable对象 | 异常类型        |
+
 
 **代码示例：**
 
@@ -896,16 +935,19 @@ public class User implements Serializable {
 ```
 
 **serialVersionUID的作用：**
+
 - 版本控制，确保序列化/反序列化兼容
 - 不定义会由编译器自动生成
 - 建议手动定义，防止类修改后不兼容
 
 **transient关键字：**
+
 - 标记的字段不参与序列化
 - 适用于敏感信息或不需要持久化的数据
 - 静态变量也不参与序列化
 
 **注意事项：**
+
 1. 如果父类实现了Serializable，子类自动序列化
 2. 如果父类没实现，子类需要单独处理父类字段
 3. 使用Externalizable可自定义序列化逻辑
@@ -922,12 +964,14 @@ public class User implements Serializable {
 
 **内部类的四种类型：**
 
-| 类型 | 定义位置 | 特点 |
-|------|----------|------|
+
+| 类型    | 定义位置  | 特点      |
+| ----- | ----- | ------- |
 | 成员内部类 | 类的方法外 | 属于外部类实例 |
 | 静态内部类 | 类的方法外 | 属于外部类本身 |
-| 局部内部类 | 方法内部 | 作用域在方法内 |
-| 匿名内部类 | 表达式内部 | 没有名字的类 |
+| 局部内部类 | 方法内部  | 作用域在方法内 |
+| 匿名内部类 | 表达式内部 | 没有名字的类  |
+
 
 **代码示例：**
 
@@ -974,6 +1018,7 @@ Outer.StaticInner staticInner = new Outer.StaticInner();
 ```
 
 **使用场景：**
+
 - 回调函数：匿名内部类
 - 事件监听：成员内部类
 - 逻辑封装：静态内部类
@@ -990,12 +1035,14 @@ Outer.StaticInner staticInner = new Outer.StaticInner();
 
 **四种代码块：**
 
-| 类型 | 语法 | 执行时机 | 作用 |
-|------|------|----------|------|
-| 静态代码块 | static {} | 类加载时执行 | 初始化静态资源 |
-| 构造代码块 | {} | 每次创建对象执行 | 抽取构造方法公共代码 |
-| 构造方法 | 类名() {} | 创建对象时执行 | 初始化实例 |
-| 局部代码块 | {} | 作用域内执行 | 控制变量生命周期 |
+
+| 类型    | 语法        | 执行时机     | 作用         |
+| ----- | --------- | -------- | ---------- |
+| 静态代码块 | static {} | 类加载时执行   | 初始化静态资源    |
+| 构造代码块 | {}        | 每次创建对象执行 | 抽取构造方法公共代码 |
+| 构造方法  | 类名() {}   | 创建对象时执行  | 初始化实例      |
+| 局部代码块 | {}        | 作用域内执行   | 控制变量生命周期   |
+
 
 **执行顺序演示：**
 
@@ -1028,6 +1075,7 @@ public class ExecutionOrder {
 ```
 
 **执行顺序总结：**
+
 ```
 父类静态代码块 → 子类静态代码块
          ↓
@@ -1083,6 +1131,7 @@ public class Student extends Person {
 ```
 
 **使用场景：**
+
 - this() 调用本类其他构造方法
 - super() 调用父类构造方法
 - this.成员 访问本类成员
@@ -1147,6 +1196,7 @@ List<Integer> result = numbers.stream()
 ```
 
 **函数式接口：**
+
 - 只包含一个抽象方法的接口
 - @FunctionalInterface注解标识
 - Lambda表达式只能用于函数式接口
@@ -1194,28 +1244,32 @@ Stream<String> stream3 = Stream.of("a", "b", "c");
 
 **中间操作：**
 
-| 操作 | 说明 | 示例 |
-|------|------|------|
-| filter | 过滤 | filter(x -> x > 0) |
-| map | 转换 | map(String::toUpperCase) |
-| flatMap | 扁平化 | flatMap(List::stream) |
-| distinct | 去重 | distinct() |
-| sorted | 排序 | sorted((a,b) -> b-a) |
-| limit | 限制数量 | limit(10) |
-| skip | 跳过 | skip(5) |
+
+| 操作       | 说明   | 示例                       |
+| -------- | ---- | ------------------------ |
+| filter   | 过滤   | filter(x -> x > 0)       |
+| map      | 转换   | map(String::toUpperCase) |
+| flatMap  | 扁平化  | flatMap(List::stream)    |
+| distinct | 去重   | distinct()               |
+| sorted   | 排序   | sorted((a,b) -> b-a)     |
+| limit    | 限制数量 | limit(10)                |
+| skip     | 跳过   | skip(5)                  |
+
 
 **终端操作：**
 
-| 操作 | 说明 | 示例 |
-|------|------|------|
-| collect | 收集结果 | collect(Collectors.toList()) |
-| forEach | 遍历 | forEach(System.out::println) |
-| count | 计数 | count() |
-| max/min | 最值 | max(Integer::compareTo) |
-| reduce | 归约 | reduce(0, Integer::sum) |
-| anyMatch | 任意匹配 | anyMatch(x -> x > 0) |
-| allMatch | 全部匹配 | allMatch(x -> x > 0) |
-| findFirst | 获取首个 | findFirst().orElse(null) |
+
+| 操作        | 说明   | 示例                           |
+| --------- | ---- | ---------------------------- |
+| collect   | 收集结果 | collect(Collectors.toList()) |
+| forEach   | 遍历   | forEach(System.out::println) |
+| count     | 计数   | count()                      |
+| max/min   | 最值   | max(Integer::compareTo)      |
+| reduce    | 归约   | reduce(0, Integer::sum)      |
+| anyMatch  | 任意匹配 | anyMatch(x -> x > 0)         |
+| allMatch  | 全部匹配 | allMatch(x -> x > 0)         |
+| findFirst | 获取首个 | findFirst().orElse(null)     |
+
 
 **示例代码：**
 
@@ -1317,18 +1371,21 @@ List<String> cities = users.stream()
 
 **Java 8内置函数式接口：**
 
-| 接口 | 方法签名 | 说明 |
-|------|----------|------|
-| Supplier<T> | T get() | 生产者，无输入，返回T |
-| Consumer<T> | void accept(T t) | 消费者，输入T，无返回 |
-| Function<T,R> | R apply(T t) | 函数，输入T，返回R |
-| Predicate<T> | boolean test(T t) | 断言，输入T，返回boolean |
-| BiFunction<T,U,R> | R apply(T t, U u) | 二元函数 |
-| BiConsumer<T,U> | void accept(T t, U u) | 二元消费者 |
-| UnaryOperator<T> | T apply(T t) | 一元运算 |
-| BinaryOperator<T> | T apply(T t1, T t2) | 二元运算 |
+
+| 接口                | 方法签名                  | 说明               |
+| ----------------- | --------------------- | ---------------- |
+| Supplier          | T get()               | 生产者，无输入，返回T      |
+| Consumer          | void accept(T t)      | 消费者，输入T，无返回      |
+| Function<T,R>     | R apply(T t)          | 函数，输入T，返回R       |
+| Predicate         | boolean test(T t)     | 断言，输入T，返回boolean |
+| BiFunction<T,U,R> | R apply(T t, U u)     | 二元函数             |
+| BiConsumer<T,U>   | void accept(T t, U u) | 二元消费者            |
+| UnaryOperator     | T apply(T t)          | 一元运算             |
+| BinaryOperator    | T apply(T t1, T t2)   | 二元运算             |
+
 
 **基本类型专用接口：**
+
 - IntSupplier, IntConsumer, IntFunction
 - LongSupplier, LongConsumer, LongFunction
 - DoubleSupplier, DoubleConsumer, DoubleFunction
@@ -1371,12 +1428,14 @@ Function<String, Integer> parseAndDouble =
 
 **方法引用的四种类型：**
 
-| 类型 | 语法 | 示例 |
-|------|------|------|
-| 静态方法引用 | Class::staticMethod | String::valueOf |
+
+| 类型           | 语法                     | 示例                  |
+| ------------ | ---------------------- | ------------------- |
+| 静态方法引用       | Class::staticMethod    | String::valueOf     |
 | 实例方法引用(特定对象) | object::instanceMethod | System.out::println |
-| 实例方法引用(任意对象) | Class::instanceMethod | String::toUpperCase |
-| 构造方法引用 | Class::new | User::new |
+| 实例方法引用(任意对象) | Class::instanceMethod  | String::toUpperCase |
+| 构造方法引用       | Class::new             | User::new           |
+
 
 **代码示例：**
 
@@ -1434,15 +1493,17 @@ List<User> users = names.stream()
 
 **新API核心类：**
 
-| 类 | 说明 | 示例 |
-|------|------|------|
-| LocalDate | 日期（年-月-日） | 2024-01-15 |
-| LocalTime | 时间（时:分:秒） | 14:30:00 |
-| LocalDateTime | 日期时间 | 2024-01-15T14:30:00 |
-| Instant | 时间戳 | 2024-01-15T06:30:00Z |
-| Duration | 时间段 | Duration.ofHours(2) |
-| Period | 日期段 | Period.ofDays(5) |
-| ZonedDateTime | 带时区的日期时间 | |
+
+| 类             | 说明        | 示例                   |
+| ------------- | --------- | -------------------- |
+| LocalDate     | 日期（年-月-日） | 2024-01-15           |
+| LocalTime     | 时间（时:分:秒） | 14:30:00             |
+| LocalDateTime | 日期时间      | 2024-01-15T14:30:00  |
+| Instant       | 时间戳       | 2024-01-15T06:30:00Z |
+| Duration      | 时间段       | Duration.ofHours(2)  |
+| Period        | 日期段       | Period.ofDays(5)     |
+| ZonedDateTime | 带时区的日期时间  |                      |
+
 
 **使用示例：**
 
@@ -1494,15 +1555,18 @@ localDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
 **Java基础核心知识点：**
 
-| 类别 | 关键知识点 |
-|------|----------|
-| 基础语法 | 数据类型、运算符、控制流程 |
-| 面向对象 | 封装、继承、多态、抽象类、接口 |
-| 核心概念 | 异常、泛型、注解、反射 |
-| 高级特性 | Lambda、Stream、Optional |
-| API使用 | 字符串处理、日期时间、集合操作 |
+
+| 类别    | 关键知识点                  |
+| ----- | ---------------------- |
+| 基础语法  | 数据类型、运算符、控制流程          |
+| 面向对象  | 封装、继承、多态、抽象类、接口        |
+| 核心概念  | 异常、泛型、注解、反射            |
+| 高级特性  | Lambda、Stream、Optional |
+| API使用 | 字符串处理、日期时间、集合操作        |
+
 
 **推荐阅读：**
+
 1. 《Effective Java》- Joshua Bloch
 2. 《Java核心技术卷I》
 3. Oracle官方Java教程

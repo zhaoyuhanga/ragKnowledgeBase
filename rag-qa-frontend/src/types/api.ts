@@ -492,10 +492,10 @@ export interface KeywordSearchResponse {
 }
 
 export interface KeywordStatistics {
-  total_indexed_chunks: number;
+  total_chunks: number;
   total_terms: number;
   avg_terms_per_chunk: number;
-  top_terms: { term: string; frequency: number }[];
+  field_distribution: Record<string, number>;
 }
 
 // ============================================
@@ -820,7 +820,7 @@ export interface QueueStatistics {
 export interface DLXMessage {
   message_id: string;
   content: string;
-  created_at: string;
+  failed_at: string;
 }
 
 export interface DLXMessagesResponse {

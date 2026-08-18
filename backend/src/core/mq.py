@@ -257,12 +257,16 @@ class RabbitMQConnectionPool:
             # 创建信道并发布
             channel = conn.channel()
             
-            # 设置默认属性
+            # 设置默认属性（支持消息优先级：从消息体提取 priority 字段）
             if properties is None:
-                properties = pika.BasicProperties(
-                    delivery_mode=2,  # 持久化
-                    content_type="application/json"
-                )
+                props_kwargs = {
+                    "delivery_mode": 2,  # 持久化
+                    "content_type": "application/json"
+                }
+                priority = message.get("priority")
+                if isinstance(priority, int) and 0 <= priority <= settings.rabbitmq.max_priority:
+                    props_kwargs["priority"] = priority
+                properties = pika.BasicProperties(**props_kwargs)
             
             # 发布消息
             channel.basic_publish(
@@ -482,13 +486,14 @@ class RabbitMQClient:
                                 except Exception:
                                     pass
                                 
-                                # 重新声明队列
+                                # 重新声明队列（支持优先级）
                                 q_channel.queue_declare(
                                     queue=queue_name,
                                     durable=queue_config.durable,
                                     arguments={
                                         "x-dead-letter-exchange": dlx_exchange,
-                                        "x-dead-letter-routing-key": settings.rabbitmq.dead_letter.routing_key
+                                        "x-dead-letter-routing-key": settings.rabbitmq.dead_letter.routing_key,
+                                        "x-max-priority": settings.rabbitmq.max_priority
                                     }
                                 )
                                 q_channel.queue_bind(

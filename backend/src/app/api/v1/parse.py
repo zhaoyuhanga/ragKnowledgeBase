@@ -14,7 +14,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 
 from app.common.response import success_response, page_response
 from app.services.parse_service import get_parse_service, ParseService
@@ -30,7 +30,7 @@ def get_parse_service_instance() -> ParseService:
 @router.post("/documents/{document_id}/parse")
 async def parse_document(
     document_id: int,
-    version_id: Optional[int] = Query(None, description="版本ID，不传则使用最新版本"),
+    version_id: Optional[int] = Body(None, description="版本ID，不传则使用最新版本"),
     service: ParseService = Depends(get_parse_service_instance)
 ):
     """

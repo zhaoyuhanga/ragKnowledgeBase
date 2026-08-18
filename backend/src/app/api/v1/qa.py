@@ -15,6 +15,7 @@
 注意：路由层只做参数校验和响应封装，业务逻辑在services层。
 """
 
+import asyncio
 import json
 import uuid
 from typing import Optional, AsyncGenerator
@@ -74,10 +75,10 @@ async def ask_question_stream(
     service: QAService = Depends(get_qa_service)
 ):
     """
-    流式问答接口
+    流式问答接口（真实流式）
 
-    根据用户问题，流式生成答案。使用SSE实现流式输出。
-    先调用完整API保存日志，再流式发送已保存的答案。
+    检索/重排/上下文组装完成后，直接透传 LLM 的增量输出（SSE 逐块转发）。
+    先以空答案落库获取 qa_id（供前端拉取引用），流式结束后回填完整答案与耗时。
 
     Args:
         request: 问答请求参数
@@ -90,41 +91,110 @@ async def ask_question_stream(
     if not session_id:
         session_id = str(uuid.uuid4())
 
+    # 准备流式问答：检索/重排/组装/落库（同步操作移到线程执行，避免阻塞事件循环）
+    stream_info = await asyncio.to_thread(
+        service.ask_question_stream,
+        question=request.question,
+        session_id=session_id,
+        user_id=request.user_id,
+        tenant_id=request.tenant_id,
+        use_rerank=request.use_rerank,
+        top_k=request.top_k or 20,
+        rerank_top_k=request.rerank_top_k or 10,
+        max_context_tokens=request.max_context_tokens or 4000,
+        temperature=request.temperature or 0.7,
+        doc_ids=request.doc_ids,
+    )
+    qa_id = stream_info["qa_id"]
+    answer_stream = stream_info["answer_stream"]
+
     async def event_generator() -> AsyncGenerator[str, None]:
+        import asyncio
+        import time as _time
+        from concurrent.futures import ThreadPoolExecutor
+
+        generation_start = _time.time()
+        full_answer_parts: list = []
+        log_completed = False
+
+        # 用「单线程消费同步生成器 + asyncio.Queue 桥接」转发 LLM 流式输出。
+        # 不能对同步生成器逐块 asyncio.to_thread(next, gen)：
+        # httpx 流式响应在不同线程间恢复会挂起且不触发超时（实测卡死）。
+        q: asyncio.Queue = asyncio.Queue(maxsize=64)
+        loop = asyncio.get_running_loop()
+        executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="llm-stream")
+
+        def _consume() -> None:
+            """在单一专用线程中消费同步生成器，逐块推入队列"""
+            try:
+                for chunk in answer_stream:
+                    if chunk:
+                        loop.call_soon_threadsafe(q.put_nowait, ("chunk", chunk))
+            except Exception as e:  # noqa: BLE001
+                loop.call_soon_threadsafe(q.put_nowait, ("error", e))
+            finally:
+                loop.call_soon_threadsafe(q.put_nowait, ("done", None))
+
+        loop.run_in_executor(executor, _consume)
+
         try:
             # 发送开始事件
             yield f"event: start\ndata: {json.dumps({'session_id': session_id}, ensure_ascii=False)}\n\n"
 
-            # 调用完整的非流式问答（会保存日志）
-            result = service.ask_question(request)
-            qa_id = result.result.qa_id
-            full_answer = result.result.answer
-
-            # 发送元数据（包含引用等信息）
-            yield f"event: metadata\ndata: {json.dumps({
+            # 发送元数据（qa_id + 各阶段耗时）
+            metadata = json.dumps({
                 'qa_id': qa_id,
-                'retrieval_time_ms': result.result.retrieval_time_ms,
-                'rerank_time_ms': result.result.rerank_time_ms,
-                'context_time_ms': result.result.context_time_ms,
-                'generation_time_ms': result.result.generation_time_ms,
-            }, ensure_ascii=False)}\n\n"
+                'session_id': session_id,
+                'retrieval_time_ms': stream_info['retrieval_time_ms'],
+                'rerank_time_ms': stream_info['rerank_time_ms'],
+                'context_time_ms': stream_info['context_time_ms'],
+            }, ensure_ascii=False)
+            yield f"event: metadata\ndata: {metadata}\n\n"
 
-            # 流式发送答案（按字符/词组发送）
-            # 简单的流式效果：将答案分块发送
-            chunk_size = 10  # 每10个字符发送一次
-            for i in range(0, len(full_answer), chunk_size):
-                chunk = full_answer[i:i + chunk_size]
-                yield f"event: content\ndata: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
-                # 添加小延迟以产生流式效果
-                import asyncio
-                await asyncio.sleep(0.02)
+            # 逐块转发 LLM 真实流式输出（带读取超时兜底，防止无限挂起）
+            while True:
+                kind, payload = await asyncio.wait_for(q.get(), timeout=180)
+                if kind == "chunk":
+                    full_answer_parts.append(payload)
+                    yield f"event: content\ndata: {json.dumps({'content': payload}, ensure_ascii=False)}\n\n"
+                elif kind == "error":
+                    raise payload
+                else:  # done
+                    break
+
+            # 流式结束，回填完整答案与耗时
+            generation_time_ms = int((_time.time() - generation_start) * 1000)
+            full_answer = "".join(full_answer_parts)
+            service.complete_qa_log(
+                qa_id=qa_id,
+                answer=full_answer,
+                generation_time_ms=generation_time_ms,
+                total_time_ms=(
+                    generation_time_ms
+                    + stream_info['retrieval_time_ms']
+                    + stream_info['rerank_time_ms']
+                    + stream_info['context_time_ms']
+                ),
+            )
+            log_completed = True
 
             # 发送完成事件
             yield f"event: done\ndata: {json.dumps({'qa_id': qa_id}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
+            # 异常（含客户端中断）时尽力回填已生成的部分答案
+            if not log_completed and full_answer_parts:
+                service.complete_qa_log(
+                    qa_id=qa_id,
+                    answer="".join(full_answer_parts),
+                    generation_time_ms=int((_time.time() - generation_start) * 1000),
+                    total_time_ms=0,
+                )
             error_msg = str(e)
             yield f"event: error\ndata: {json.dumps({'error': error_msg}, ensure_ascii=False)}\n\n"
+
+        finally:
+            executor.shutdown(wait=False)
 
     return StreamingResponse(
         event_generator(),

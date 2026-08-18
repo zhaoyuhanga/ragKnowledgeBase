@@ -95,11 +95,15 @@ class DocumentVersionService:
 
         db.add(version)
 
-        # 更新文档的当前版本
+        # 更新文档的当前版本与版本总数
+        # total_versions 直接取版本号：新建文档默认 total_versions=1，
+        # 若再执行 +1 会造成首版本后总数变 2（off-by-one）
         document.current_version_id = version.id
-        document.total_versions += 1
+        document.total_versions = new_version
 
-        db.commit()
+        # 只 flush 不提交，事务边界由调用方（upload_document）统一控制，
+        # 避免中途提交导致后续失败时 document/version 已落库而任务关联回滚
+        db.flush()
         db.refresh(version)
 
         logger.info(

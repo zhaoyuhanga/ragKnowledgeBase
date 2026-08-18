@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 中间件模块
 
@@ -21,11 +21,12 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from fastapi import FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.common.exception import BusinessException
+from app.common.exception import BusinessException, ErrorCode
 from app.common.logging import get_trace_id, log_request_error, log_request_info
 from app.common.response import error_response
 from core.config import settings
@@ -116,7 +117,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     message=e.message,
                     data=e.data,
                     trace_id=trace_id
-                ).model_dump(),
+                ).model_dump(by_alias=True),
                 headers={"X-Trace-Id": trace_id}
             )
 
@@ -143,7 +144,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     code="SYS_1000",
                     message="系统错误，请稍后重试",
                     trace_id=trace_id
-                ).model_dump(),
+                ).model_dump(by_alias=True),
                 headers={"X-Trace-Id": trace_id}
             )
 
@@ -281,7 +282,7 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
                     code="SYS_1000",
                     message="系统错误，请稍后重试",
                     trace_id=trace_id
-                ).model_dump(),
+                ).model_dump(by_alias=True),
                 headers={"X-Trace-Id": trace_id}
             )
 
@@ -305,3 +306,50 @@ def setup_middleware(app: FastAPI) -> None:
             allow_methods=settings.cors.allow_methods if settings.cors.allow_methods else ["*"],
             allow_headers=settings.cors.allow_headers if settings.cors.allow_headers else ["*"],
         )
+
+    # 注册参数校验异常处理器：FastAPI 422 校验错误统一转换为规范错误格式
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
+
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError
+) -> JSONResponse:
+    """
+    参数校验异常处理器
+
+    将 FastAPI 默认的 422 校验错误转换为统一错误响应格式，
+    避免校验失败被通用异常分支吞成"系统错误"。
+
+    Args:
+        request: 请求对象
+        exc: 校验异常
+
+    Returns:
+        统一格式的错误响应
+    """
+    trace_id = request.headers.get("X-Trace-Id") or get_trace_id()
+
+    # 提取第一条校验错误，生成可读信息
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    loc = ".".join(str(x) for x in first.get("loc", [])) or "request"
+    msg = f"参数校验失败: {loc} {first.get('msg', '')}"
+
+    log_request_error(
+        message=msg,
+        error=exc,
+        trace_id=trace_id,
+        method=request.method,
+        uri=str(request.url.path)
+    )
+
+    return JSONResponse(
+        status_code=200,  # 统一使用200，错误信息在响应体中
+        content=error_response(
+            code=ErrorCode.PARAM_INVALID[0],
+            message=msg,
+            trace_id=trace_id
+        ).model_dump(by_alias=True),
+        headers={"X-Trace-Id": trace_id}
+    )

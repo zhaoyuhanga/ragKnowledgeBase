@@ -10,7 +10,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, Query
 from pydantic import BaseModel
 
 from app.common.logging import logger
@@ -18,7 +18,7 @@ from app.common.response import success_response, error_response
 from app.schemas.keyword import KeywordSearchRequest
 from app.services.keyword_service import get_keyword_index_service
 
-router = APIRouter(prefix="/keyword", tags=["关键词索引服务"])
+router = APIRouter(tags=["关键词索引服务"])
 
 
 # ================================================
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/keyword", tags=["关键词索引服务"])
 @router.post("/index/{document_id}", response_model=BaseModel)
 async def build_keyword_index(
     document_id: int,
-    version_id: Optional[int] = None
+    version_id: Optional[int] = Body(None, description="版本ID")
 ):
     """
     构建关键词索引
@@ -60,7 +60,7 @@ async def build_keyword_index(
 
 
 @router.post("/index/batch", response_model=BaseModel)
-async def batch_build_keyword_index(document_ids: list[int]):
+async def batch_build_keyword_index(document_ids: list[int] = Body(..., description="文档ID列表")):
     """
     批量构建关键词索引
 
@@ -119,10 +119,10 @@ async def batch_build_keyword_index(document_ids: list[int]):
 
 @router.post("/search", response_model=BaseModel)
 async def search_by_keyword(
-    query: str,
-    top_k: int = Query(default=50, ge=1, le=200, description="返回结果数量"),
-    document_ids: Optional[str] = Query(default=None, description="文档ID列表，逗号分隔"),
-    chunk_types: Optional[str] = Query(default=None, description="Chunk类型列表，逗号分隔")
+    query: str = Body(..., description="查询文本"),
+    top_k: int = Body(50, ge=1, le=200, description="返回结果数量"),
+    document_ids: Optional[str] = Body(None, description="文档ID列表，逗号分隔"),
+    chunk_types: Optional[str] = Body(None, description="Chunk类型列表，逗号分隔")
 ):
     """
     关键词检索

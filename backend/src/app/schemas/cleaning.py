@@ -11,7 +11,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ================================================
@@ -20,12 +20,16 @@ from pydantic import BaseModel, Field
 
 class CleaningRuleBase(BaseModel):
     """清洗规则基础模型"""
-    name: str = Field(..., description="规则名称", min_length=1, max_length=100)
+    # 字段名与 API 接口文档契约保持一致：
+    # name ↔ rule_name、is_enabled ↔ enabled、scope ↔ scope_type
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: str = Field(..., alias="rule_name", description="规则名称", min_length=1, max_length=100)
     rule_type: str = Field(..., description="规则类型")
     rule_config: Dict[str, Any] = Field(..., description="规则配置")
     priority: int = Field(default=100, description="优先级（数字越小越优先）")
-    is_enabled: int = Field(default=1, description="是否启用：0-禁用 1-启用")
-    scope: Optional[str] = Field(None, description="适用范围：all/pdf/docx/image/table")
+    is_enabled: int = Field(default=1, alias="enabled", description="是否启用：0-禁用 1-启用")
+    scope: Optional[str] = Field(None, alias="scope_type", description="适用范围：all/pdf/docx/image/table")
     business_scope: Optional[str] = Field(None, description="业务范围筛选")
     description: Optional[str] = Field(None, description="规则说明")
 
@@ -38,34 +42,35 @@ class CleaningRuleCreate(CleaningRuleBase):
 
 class CleaningRuleUpdate(BaseModel):
     """清洗规则更新模型"""
-    name: Optional[str] = Field(None, description="规则名称")
+    model_config = ConfigDict(populate_by_name=True)
+
+    name: Optional[str] = Field(None, alias="rule_name", description="规则名称")
     rule_type: Optional[str] = Field(None, description="规则类型")
     rule_config: Optional[Dict[str, Any]] = Field(None, description="规则配置")
     priority: Optional[int] = Field(None, description="优先级")
-    is_enabled: Optional[int] = Field(None, description="是否启用")
-    scope: Optional[str] = Field(None, description="适用范围")
+    is_enabled: Optional[int] = Field(None, alias="enabled", description="是否启用")
+    scope: Optional[str] = Field(None, alias="scope_type", description="适用范围")
     business_scope: Optional[str] = Field(None, description="业务范围筛选")
     description: Optional[str] = Field(None, description="规则说明")
 
 
 class CleaningRuleResponse(BaseModel):
     """清洗规则响应模型"""
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     id: int = Field(..., description="规则ID")
-    name: str = Field(..., description="规则名称")
+    name: str = Field(..., alias="rule_name", description="规则名称")
     rule_type: str = Field(..., description="规则类型")
     rule_config: Dict[str, Any] = Field(..., description="规则配置")
     priority: int = Field(..., description="优先级")
-    is_enabled: int = Field(..., description="是否启用")
-    scope: Optional[str] = Field(None, description="适用范围")
+    is_enabled: int = Field(..., alias="enabled", description="是否启用")
+    scope: Optional[str] = Field(None, alias="scope_type", description="适用范围")
     business_scope: Optional[str] = Field(None, description="业务范围筛选")
     description: Optional[str] = Field(None, description="规则说明")
     effect_count: int = Field(..., description="生效次数")
     creator_name: Optional[str] = Field(None, description="创建人姓名")
     created_at: Optional[str] = Field(None, description="创建时间")
     updated_at: Optional[str] = Field(None, description="更新时间")
-
-    class Config:
-        from_attributes = True
 
 
 # ================================================

@@ -1,10 +1,9 @@
-import { request } from './api';
+import { request, BASE_URL as API_BASE_URL } from './api';
 import type {
   ApiResponse,
   PaginatedResponse,
   QARequest,
   QAResponse,
-  QAResponseData,
   QAFeedbackRequest,
   QAFeedbackResponse,
   QAHistoryItem,

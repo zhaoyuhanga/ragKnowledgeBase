@@ -20,13 +20,15 @@ RAG（Retrieval-Augmented Generation）问答系统是一个基于检索增强�
 
 ### 1.2 核心功能
 
-| 功能 | 说明 |
-|------|------|
-| 文档管理 | 支持 PDF、Markdown、TXT、DOCX 格式文档上传和解析 |
-| 知识库构建 | 智能文本切分、向量化存储到 Milvus 向量数据库 |
-| 智能问答 | 基于向量检索和 LLM 生成准确、专业的回答 |
-| 缓存管理 | Redis 缓存热点问答，降低 API 调用成本 |
-| AI 扩展 | 本地检索为空时，调用 LLM 生成内容并回存向量库 |
+
+| 功能    | 说明                                 |
+| ----- | ---------------------------------- |
+| 文档管理  | 支持 PDF、Markdown、TXT、DOCX 格式文档上传和解析 |
+| 知识库构建 | 智能文本切分、向量化存储到 Milvus 向量数据库         |
+| 智能问答  | 基于向量检索和 LLM 生成准确、专业的回答             |
+| 缓存管理  | Redis 缓存热点问答，降低 API 调用成本           |
+| AI 扩展 | 本地检索为空时，调用 LLM 生成内容并回存向量库          |
+
 
 ### 1.3 项目结构
 
@@ -76,41 +78,47 @@ rag-qa-frontend/              # 前端项目
 
 ### 2.1 后端技术栈
 
-| 类别 | 技术 | 版本 | 用途 |
-|------|------|------|------|
-| **Web 框架** | FastAPI | 0.109.2 | 高性能异步 API 框架 |
-| **异步服务器** | Uvicorn | 0.27.1 | ASGI 服务器 |
-| **数据库** | MySQL | 8.0 | 元数据存储 |
-| **ORM** | SQLAlchemy | 2.0.25 | 数据库 ORM |
-| **向量数据库** | Milvus | 2.4 | 文档向量存储与检索 |
-| **缓存** | Redis | 5.0 | 热点问答缓存 |
-| **Embedding** | Ollama + Qwen3 | - | 本地向量模型 |
-| **LLM** | DeepSeek API | - | 大语言模型 |
-| **文档解析** | pypdf, python-docx | - | PDF/DOCX 解析 |
-| **配置管理** | Pydantic Settings | 2.1.0 | 环境变量配置 |
-| **日志** | Loguru | 0.7.2 | 结构化日志 |
-| **测试** | pytest | 7.4.4 | 单元测试 |
+
+| 类别            | 技术                 | 版本      | 用途           |
+| ------------- | ------------------ | ------- | ------------ |
+| **Web 框架**    | FastAPI            | 0.109.2 | 高性能异步 API 框架 |
+| **异步服务器**     | Uvicorn            | 0.27.1  | ASGI 服务器     |
+| **数据库**       | MySQL              | 8.0     | 元数据存储        |
+| **ORM**       | SQLAlchemy         | 2.0.25  | 数据库 ORM      |
+| **向量数据库**     | Milvus             | 2.4     | 文档向量存储与检索    |
+| **缓存**        | Redis              | 5.0     | 热点问答缓存       |
+| **Embedding** | Ollama + Qwen3     | -       | 本地向量模型       |
+| **LLM**       | DeepSeek API       | -       | 大语言模型        |
+| **文档解析**      | pypdf, python-docx | -       | PDF/DOCX 解析  |
+| **配置管理**      | Pydantic Settings  | 2.1.0   | 环境变量配置       |
+| **日志**        | Loguru             | 0.7.2   | 结构化日志        |
+| **测试**        | pytest             | 7.4.4   | 单元测试         |
+
 
 ### 2.2 前端技术栈
 
-| 类别 | 技术 | 版本 | 用途 |
-|------|------|------|------|
-| **框架** | Vue 3 | 3.4.21 | 前端框架 |
-| **路由** | Vue Router | 4.3.0 | SPA 路由 |
-| **状态管理** | Pinia | 2.1.7 | 状态管理 |
-| **HTTP 客户端** | Axios | 1.6.7 | API 请求 |
-| **UI 组件** | Element Plus | 2.6.1 | UI 组件库 |
-| **构建工具** | Vite | 5.1.6 | 前端构建 |
-| **类型系统** | TypeScript | 5.4.2 | 类型检查 |
+
+| 类别           | 技术           | 版本     | 用途     |
+| ------------ | ------------ | ------ | ------ |
+| **框架**       | Vue 3        | 3.4.21 | 前端框架   |
+| **路由**       | Vue Router   | 4.3.0  | SPA 路由 |
+| **状态管理**     | Pinia        | 2.1.7  | 状态管理   |
+| **HTTP 客户端** | Axios        | 1.6.7  | API 请求 |
+| **UI 组件**    | Element Plus | 2.6.1  | UI 组件库 |
+| **构建工具**     | Vite         | 5.1.6  | 前端构建   |
+| **类型系统**     | TypeScript   | 5.4.2  | 类型检查   |
+
 
 ### 2.3 基础设施
 
-| 类别 | 技术 | 用途 |
-|------|------|------|
-| **容器化** | Docker | 应用容器化部署 |
-| **向量模型** | Ollama | 本地 Embedding/Reranker |
-| **Embedding 模型** | Qwen3-Embedding | 文本向量化 (2560 维) |
-| **Reranker 模型** | Qwen3-Reranker | 检索结果重排序 |
+
+| 类别               | 技术              | 用途                    |
+| ---------------- | --------------- | --------------------- |
+| **容器化**          | Docker          | 应用容器化部署               |
+| **向量模型**         | Ollama          | 本地 Embedding/Reranker |
+| **Embedding 模型** | Qwen3-Embedding | 文本向量化 (2560 维)        |
+| **Reranker 模型**  | Qwen3-Reranker  | 检索结果重排序               |
+
 
 ---
 
@@ -313,12 +321,14 @@ rag-qa-frontend/              # 前端项目
 **功能**：将长文档智能切分为适合检索的小块
 
 **切分策略**：
+
 1. **结构优先**：按 Markdown 标题、段落、列表、表格、代码块切分
 2. **Token 约束**：每个 Chunk 目标 600 tokens，最大 900 tokens
 3. **Overlap**：相邻 Chunk 之间保留 100 tokens 重叠
 4. **Parent-Child**：保留章节层级，支持层级检索
 
 **关键类**：
+
 - `ChunkMetadata`: Chunk 元数据
 - `Chunk`: 切分结果
 - `Section`: 文档章节
@@ -328,11 +338,13 @@ rag-qa-frontend/              # 前端项目
 **功能**：将文本转换为向量表示
 
 **配置**：
+
 - Provider: Ollama
 - Model: Qwen3-Embedding (2560 维)
 - 归一化: L2 归一化
 
 **接口**：
+
 - `encode(texts)`: 批量编码
 - `encode_single(text)`: 单条编码
 - `check_health()`: 健康检查
@@ -342,12 +354,14 @@ rag-qa-frontend/              # 前端项目
 **功能**：Milvus 向量数据库封装
 
 **特性**：
+
 - 单例模式
 - 自动创建 Collection
 - 支持 MMR（最大边际相关）重排序
 - 支持按 source_type 过滤
 
 **接口**：
+
 - `add_vectors()`: 添加向量
 - `search_vectors()`: 向量检索
 - `delete_vectors()`: 删除向量
@@ -357,11 +371,13 @@ rag-qa-frontend/              # 前端项目
 **功能**：使用 Cross-Encoder 对检索结果重新排序
 
 **配置**：
+
 - Model: Qwen3-Reranker
 - recall_k: 召回数量 (默认 50)
 - top_k: 最终返回数量 (默认 10)
 
 **接口**：
+
 - `rerank(query, candidates)`: 重排序
 
 ### 5.5 QAService (问答服务)
@@ -369,6 +385,7 @@ rag-qa-frontend/              # 前端项目
 **功能**：核心问答业务逻辑
 
 **流程**：
+
 1. 缓存检查
 2. 向量检索
 3. Rerank 重排序
@@ -380,6 +397,7 @@ rag-qa-frontend/              # 前端项目
 **功能**：Redis 缓存封装
 
 **特性**：
+
 - QA 缓存: TTL 可配置
 - 缓存键前缀
 - 序列化: JSON
@@ -392,54 +410,60 @@ rag-qa-frontend/              # 前端项目
 
 #### documents 表
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INT | 主键 |
-| filename | VARCHAR | 文件名 |
-| file_path | VARCHAR | 文件路径 |
-| file_type | VARCHAR | 文件类型 |
-| file_size | INT | 文件大小 |
-| content_hash | VARCHAR | 内容哈希 |
-| status | TINYINT | 状态 (0: 处理中, 1: 完成, 2: 失败) |
-| chunk_count | INT | Chunk 数量 |
-| source_type | VARCHAR | 来源类型 (local/ai_generated) |
-| generated_from_question | TEXT | AI 生成时的原始问题 |
-| generated_at | DATETIME | AI 生成时间 |
-| llm_model | VARCHAR | 使用的 LLM 模型 |
-| llm_provider | VARCHAR | LLM 提供商 |
-| created_at | DATETIME | 创建时间 |
-| updated_at | DATETIME | 更新时间 |
+
+| 字段                      | 类型       | 说明                        |
+| ----------------------- | -------- | ------------------------- |
+| id                      | INT      | 主键                        |
+| filename                | VARCHAR  | 文件名                       |
+| file_path               | VARCHAR  | 文件路径                      |
+| file_type               | VARCHAR  | 文件类型                      |
+| file_size               | INT      | 文件大小                      |
+| content_hash            | VARCHAR  | 内容哈希                      |
+| status                  | TINYINT  | 状态 (0: 处理中, 1: 完成, 2: 失败) |
+| chunk_count             | INT      | Chunk 数量                  |
+| source_type             | VARCHAR  | 来源类型 (local/ai_generated) |
+| generated_from_question | TEXT     | AI 生成时的原始问题               |
+| generated_at            | DATETIME | AI 生成时间                   |
+| llm_model               | VARCHAR  | 使用的 LLM 模型                |
+| llm_provider            | VARCHAR  | LLM 提供商                   |
+| created_at              | DATETIME | 创建时间                      |
+| updated_at              | DATETIME | 更新时间                      |
+
 
 #### document_chunks 表
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INT | 主键 |
-| document_id | INT | 关联文档 ID |
-| chunk_index | INT | Chunk 序号 |
-| content | TEXT | Chunk 内容 |
-| char_count | INT | 字符数 |
-| token_count | INT | Token 数 |
-| content_hash | VARCHAR | 内容哈希 |
-| vector_id | VARCHAR | Milvus 向量 ID |
-| title_path | VARCHAR | 标题路径 |
-| section_level | INT | 章节层级 |
-| block_type | VARCHAR | 块类型 |
-| source_type | VARCHAR | 来源类型 |
+
+| 字段            | 类型      | 说明           |
+| ------------- | ------- | ------------ |
+| id            | INT     | 主键           |
+| document_id   | INT     | 关联文档 ID      |
+| chunk_index   | INT     | Chunk 序号     |
+| content       | TEXT    | Chunk 内容     |
+| char_count    | INT     | 字符数          |
+| token_count   | INT     | Token 数      |
+| content_hash  | VARCHAR | 内容哈希         |
+| vector_id     | VARCHAR | Milvus 向量 ID |
+| title_path    | VARCHAR | 标题路径         |
+| section_level | INT     | 章节层级         |
+| block_type    | VARCHAR | 块类型          |
+| source_type   | VARCHAR | 来源类型         |
+
 
 #### qa_logs 表
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INT | 主键 |
-| question | TEXT | 问题 |
-| answer | TEXT | 回答 |
-| referenced_chunks | JSON | 引用的 Chunk IDs |
-| response_time_ms | INT | 响应时间 |
-| cache_hit | BOOLEAN | 是否命中缓存 |
-| source_type | VARCHAR | 来源类型 |
-| session_id | VARCHAR | 会话 ID |
-| created_at | DATETIME | 创建时间 |
+
+| 字段                | 类型       | 说明            |
+| ----------------- | -------- | ------------- |
+| id                | INT      | 主键            |
+| question          | TEXT     | 问题            |
+| answer            | TEXT     | 回答            |
+| referenced_chunks | JSON     | 引用的 Chunk IDs |
+| response_time_ms  | INT      | 响应时间          |
+| cache_hit         | BOOLEAN  | 是否命中缓存        |
+| source_type       | VARCHAR  | 来源类型          |
+| session_id        | VARCHAR  | 会话 ID         |
+| created_at        | DATETIME | 创建时间          |
+
 
 ---
 
@@ -447,38 +471,46 @@ rag-qa-frontend/              # 前端项目
 
 ### 7.1 文档管理 API
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | /api/v1/documents/upload | 上传文档 |
-| GET | /api/v1/documents | 获取文档列表 |
-| GET | /api/v1/documents/{id} | 获取文档详情 |
-| GET | /api/v1/documents/{id}/content | 获取文档内容 |
-| DELETE | /api/v1/documents/{id} | 删除文档 |
+
+| 方法     | 路径                             | 说明     |
+| ------ | ------------------------------ | ------ |
+| POST   | /api/v1/documents/upload       | 上传文档   |
+| GET    | /api/v1/documents              | 获取文档列表 |
+| GET    | /api/v1/documents/{id}         | 获取文档详情 |
+| GET    | /api/v1/documents/{id}/content | 获取文档内容 |
+| DELETE | /api/v1/documents/{id}         | 删除文档   |
+
 
 ### 7.2 问答 API
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | /api/v1/qa/ask | 问答（非流式） |
-| POST | /api/v1/qa/ask/stream | 问答（流式） |
-| GET | /api/v1/qa/history | 获取问答历史 |
+
+| 方法   | 路径                    | 说明      |
+| ---- | --------------------- | ------- |
+| POST | /api/v1/qa/ask        | 问答（非流式） |
+| POST | /api/v1/qa/ask/stream | 问答（流式）  |
+| GET  | /api/v1/qa/history    | 获取问答历史  |
+
 
 ### 7.3 知识库 API
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | /api/v1/knowledge/stats | 知识库统计 |
-| POST | /api/v1/knowledge/rebuild | 重建知识库 |
-| DELETE | /api/v1/knowledge/cache | 清空缓存 |
+
+| 方法     | 路径                        | 说明    |
+| ------ | ------------------------- | ----- |
+| GET    | /api/v1/knowledge/stats   | 知识库统计 |
+| POST   | /api/v1/knowledge/rebuild | 重建知识库 |
+| DELETE | /api/v1/knowledge/cache   | 清空缓存  |
+
 
 ### 7.4 系统 API
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | /api/v1/system/health | 健康检查 |
-| GET | /api/v1/system/stats | 系统统计 |
-| GET | /api/v1/system/config | 获取运行时配置 |
+
+| 方法  | 路径                          | 说明      |
+| --- | --------------------------- | ------- |
+| GET | /api/v1/system/health       | 健康检查    |
+| GET | /api/v1/system/stats        | 系统统计    |
+| GET | /api/v1/system/config       | 获取运行时配置 |
 | PUT | /api/v1/system/config/{key} | 更新运行时配置 |
+
 
 ---
 
@@ -486,3 +518,4 @@ rag-qa-frontend/              # 前端项目
 
 - 项目版本: 1.0.0
 - 文档更新: 2026-05-18
+

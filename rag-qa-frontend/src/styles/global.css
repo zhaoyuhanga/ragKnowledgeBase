@@ -148,6 +148,7 @@ a:hover {
   left: 0;
   right: 0;
   z-index: 100;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.06);
 }
 
 .app-sider {
@@ -156,10 +157,9 @@ a:hover {
   top: var(--layout-header-height);
   bottom: 0;
   width: var(--layout-sider-width);
-  background: var(--color-bg);
-  border-right: 1px solid var(--color-border-secondary);
   overflow-y: auto;
   z-index: 99;
+  scrollbar-width: thin;
 }
 
 .app-content {
@@ -167,7 +167,112 @@ a:hover {
   margin-top: var(--layout-header-height);
   padding: 24px;
   min-height: calc(100vh - var(--layout-header-height));
-  background: var(--color-bg-layout);
+  background: linear-gradient(180deg, #f0f2f5 0%, #eef1f6 100%);
+}
+
+/* 侧栏品牌区 */
+.app-brand {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app-brand-logo {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1677ff, #69b1ff);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.45);
+}
+
+.app-brand-title {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 健康状态标签（带脉冲圆点） */
+.health-tag {
+  display: inline-flex;
+  align-items: center;
+}
+
+.health-tag .ant-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 1px 12px;
+  border: none;
+  font-weight: 500;
+}
+
+.health-tag .ant-tag::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.health-tag .ant-tag-success::before {
+  box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.6);
+  animation: healthPulse 2s infinite;
+}
+
+@keyframes healthPulse {
+  0% { box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(82, 196, 26, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(82, 196, 26, 0); }
+}
+
+/* 顶部用户区悬浮态 */
+.header-user {
+  transition: background var(--transition-fast);
+}
+
+.header-user:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* Card 悬浮增强 */
+.ant-card {
+  transition: box-shadow var(--transition-normal), transform var(--transition-normal);
+}
+
+.ant-card-hoverable:hover {
+  transform: translateY(-2px);
+}
+
+/* 统计卡片角标渐变描边 */
+.stat-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-primary), #69b1ff);
+  opacity: 0.85;
 }
 
 /* Card Styles */
@@ -295,19 +400,23 @@ a:hover {
 
 .qa-message {
   margin-bottom: 16px;
-  padding: 16px;
-  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  border-radius: 12px;
+  animation: fadeIn var(--transition-normal) ease-out;
 }
 
 .qa-message.user {
-  background: #e6f4ff;
+  background: linear-gradient(135deg, #e6f4ff, #d6ecff);
   margin-left: 48px;
+  border-top-right-radius: 4px;
 }
 
 .qa-message.assistant {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   margin-right: 48px;
+  border-top-left-radius: 4px;
+  box-shadow: var(--shadow-1);
 }
 
 .qa-question {
@@ -324,16 +433,42 @@ a:hover {
 .qa-references {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid var(--color-border-secondary);
+  border-top: 1px dashed var(--color-border-secondary);
 }
 
 .qa-reference-item {
   font-size: 12px;
   color: var(--color-text-secondary);
-  padding: 8px;
+  padding: 8px 10px;
   background: var(--color-bg-layout);
   border-radius: var(--radius-sm);
   margin-top: 8px;
+  border-left: 3px solid var(--color-primary);
+}
+
+/* 打字指示器 */
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.typing-indicator span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  opacity: 0.4;
+  animation: typingBounce 1.2s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }
 
 /* Animation */
@@ -353,6 +488,30 @@ a:hover {
 
 .spinning {
   animation: spin 1s linear infinite;
+}
+
+/* Table 行悬浮 */
+.data-table .ant-table-tbody > tr:hover > td {
+  background: #f5faff !important;
+}
+
+/* 空态 */
+.ant-empty {
+  padding: 32px 0;
+}
+
+/* 页面标题区 */
+.page-header {
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  background: var(--color-bg);
+  border-radius: 12px;
+  box-shadow: var(--shadow-1);
+}
+
+.page-header h1 {
+  font-size: 20px;
+  margin-bottom: 6px;
 }
 
 /* Utility Classes */

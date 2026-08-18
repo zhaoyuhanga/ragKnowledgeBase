@@ -87,6 +87,6 @@ class TestConfig:
         """测试向量化配置"""
         from core.config import settings
 
-        # 验证向量化配置
-        assert settings.embedding.model_name == "Qwen3-Embedding"
+        # 验证向量化配置（真实模型名见 application-local.yml，随 V3 定版更新）
+        assert settings.embedding.model_name == "qwen3-embedding:4b-q6"
         assert settings.embedding.dimension == 1024

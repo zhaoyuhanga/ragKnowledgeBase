@@ -20,7 +20,8 @@ from app.services.chunk_service import (
     TokenCounter,
 )
 from app.schemas.chunk import ChunkConfigRequest
-from app.models.parse import DocumentElement, ElementType
+from app.models.parse import DocumentElement
+from app.parsers.base import ElementType
 
 
 class TestTokenCounter:
@@ -192,8 +193,8 @@ class TestChunkService:
 
     def test_split_by_char_count(self):
         """测试按字符数拆分"""
-        text = "测试文本" * 100
-        config = ChunkConfigRequest(max_tokens=100)  # 设置较小值
+        text = "测试文本" * 200  # 800字符，max_tokens=200（阈值400字符）时必然拆分为多块
+        config = ChunkConfigRequest(max_tokens=200)  # 设置较小值（schema 约束 ge=200）
 
         chunks = self.service._split_by_char_count(text, config)
 
@@ -323,6 +324,26 @@ class TestChunkService:
 
 class TestChunkSplitStrategies:
     """切分策略测试"""
+
+    def _create_element(
+        self,
+        element_id: str,
+        element_type: ElementType,
+        content: str,
+        level: int = None
+    ) -> DocumentElement:
+        """创建测试用元素"""
+        element = MagicMock(spec=DocumentElement)
+        element.element_id = element_id
+        element.element_type = element_type.value
+        element.content = content
+        element.title_level = level
+        element.title_path = None
+        element.page_no = 1
+        element.table_structure = None
+        element.image_description = None
+        element.confidence = 0.9
+        return element
 
     def setup_method(self):
         """测试前准备"""

@@ -59,14 +59,14 @@ echo 等待服务启动...
 timeout /t 5 /nobreak >nul
 
 REM 检查服务是否启动成功
-curl -s http://127.0.0.1:8011/health >nul 2>&1
+curl -s http://127.0.0.1:8011/api/v1/health >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     echo.
     echo [成功] 后端服务已启动！
     echo.
     echo 可用接口：
     echo   - API文档: http://127.0.0.1:8011/docs
-    echo   - 健康检查: http://127.0.0.1:8011/health
+    echo   - 健康检查: http://127.0.0.1:8011/api/v1/health
     echo.
 ) else (
     echo.

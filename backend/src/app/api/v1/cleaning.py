@@ -10,11 +10,11 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Body, Query
 from pydantic import BaseModel
 
 from app.common.logging import logger
-from app.common.response import success_response, error_response
+from app.common.response import page_response, success_response, error_response
 from app.models.document import Document, DocumentVersion
 from app.models.parse import DocumentElement
 from app.schemas.cleaning import (
@@ -28,7 +28,7 @@ from app.schemas.cleaning import (
 )
 from app.services.clean_service import get_clean_service
 
-router = APIRouter(prefix="/cleaning", tags=["清洗服务"])
+router = APIRouter(tags=["清洗服务"])
 
 
 # ================================================
@@ -126,12 +126,13 @@ async def list_cleaning_rules(
             rule_type=rule_type,
             enabled_only=enabled_only
         )
-        return success_response(data={
-            "items": [r.model_dump() for r in rules],
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }, message="获取清洗规则列表成功")
+        return page_response(
+            items=[r.model_dump(by_alias=True) for r in rules],
+            total=total,
+            page_no=page,
+            page_size=page_size,
+            message="获取清洗规则列表成功"
+        )
     except Exception as e:
         logger.error(f"获取清洗规则列表失败: {str(e)}")
         return error_response(message=f"获取清洗规则列表失败: {str(e)}")
@@ -167,8 +168,8 @@ async def get_cleaning_rule(rule_id: int):
 @router.post("/documents/{document_id}", response_model=BaseModel)
 async def clean_document(
     document_id: int,
-    version_id: Optional[int] = None,
-    config: Optional[CleaningConfig] = None
+    version_id: Optional[int] = Body(None, description="版本ID（可选，默认使用最新版本）"),
+    config: Optional[CleaningConfig] = Body(None, description="清洗配置（可选，使用默认配置）")
 ):
     """
     清洗文档
@@ -415,12 +416,13 @@ async def list_cleaning_logs(
                     created_at=log.created_at.isoformat() if log.created_at else None
                 ))
 
-            return success_response(data={
-                "items": [item.model_dump() for item in items],
-                "total": total,
-                "page": page,
-                "page_size": page_size
-            }, message="获取清洗日志列表成功")
+            return page_response(
+                items=[item.model_dump() for item in items],
+                total=total,
+                page_no=page,
+                page_size=page_size,
+                message="获取清洗日志列表成功"
+            )
 
         finally:
             db.close()

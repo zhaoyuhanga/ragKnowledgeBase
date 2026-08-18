@@ -221,7 +221,7 @@ const Settings: React.FC = () => {
         {keywordStats ? (
           <Descriptions column={2}>
             <Descriptions.Item label="索引Chunk数">
-              {keywordStats.total_indexed_chunks}
+              {keywordStats.total_chunks}
             </Descriptions.Item>
             <Descriptions.Item label="总词项数">
               {keywordStats.total_terms}

@@ -18,22 +18,32 @@
     return error_response(code="BIZ_2001", message="数据不存在")
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Generic, List, Optional, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # 定义泛型类型
 T = TypeVar("T")
 
+# 统一使用北京时间（UTC+8），与接口文档时间戳格式一致（如 2026-05-22T12:00:00+08:00）
+_CST = timezone(timedelta(hours=8))
+
+
+def _now_iso() -> str:
+    """生成北京时间 ISO8601 时间戳（秒级精度）"""
+    return datetime.now(_CST).isoformat(timespec="seconds")
+
 
 class BaseResponse(BaseModel):
     """响应基础模型"""
+    model_config = ConfigDict(populate_by_name=True)
+
     code: int = Field(default=0, description="状态码，0表示成功")
     message: str = Field(default="success", description="响应消息")
     data: Any = Field(default=None, description="响应数据")
-    trace_id: str = Field(default="", description="追踪ID")
+    trace_id: str = Field(default="", alias="traceId", description="追踪ID")
     timestamp: str = Field(
         default="",
         description="ISO8601格式时间戳"
@@ -42,22 +52,24 @@ class BaseResponse(BaseModel):
     def __init__(self, **data):
         """初始化响应，自动设置时间戳"""
         if "timestamp" not in data or not data["timestamp"]:
-            data["timestamp"] = datetime.now(timezone.utc).isoformat()
+            data["timestamp"] = _now_iso()
         super().__init__(**data)
 
 
 class ErrorResponse(BaseModel):
     """错误响应模型"""
+    model_config = ConfigDict(populate_by_name=True)
+
     code: str = Field(description="错误码")
     message: str = Field(description="错误消息")
     data: Any = Field(default=None, description="错误数据")
-    trace_id: str = Field(default="", description="追踪ID")
+    trace_id: str = Field(alias="traceId", description="追踪ID")
     timestamp: str = Field(description="ISO8601格式时间戳")
 
     def __init__(self, **data):
         """初始化错误响应，自动设置时间戳"""
         if "timestamp" not in data or not data["timestamp"]:
-            data["timestamp"] = datetime.now(timezone.utc).isoformat()
+            data["timestamp"] = _now_iso()
         super().__init__(**data)
 
 
@@ -72,16 +84,18 @@ class PageInfo(BaseModel):
 
 class PageResponse(BaseModel):
     """分页响应模型"""
+    model_config = ConfigDict(populate_by_name=True)
+
     code: int = Field(default=0, description="状态码")
     message: str = Field(default="success", description="响应消息")
     data: PageInfo = Field(description="分页数据")
-    trace_id: str = Field(default="", description="追踪ID")
+    trace_id: str = Field(default="", alias="traceId", description="追踪ID")
     timestamp: str = Field(description="ISO8601格式时间戳")
 
     def __init__(self, **data):
         """初始化分页响应，自动设置时间戳"""
         if "timestamp" not in data or not data["timestamp"]:
-            data["timestamp"] = datetime.now(timezone.utc).isoformat()
+            data["timestamp"] = _now_iso()
         super().__init__(**data)
 
 

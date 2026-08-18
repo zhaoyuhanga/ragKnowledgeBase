@@ -181,21 +181,42 @@ class EmbeddingService:
                     # 确保 text 是字符串
                     if not isinstance(text, str):
                         text = str(text) if text is not None else ""
-                    
+
                     if not text or not text.strip():
                         embeddings.append(np.zeros(self._config.dimension))
                         continue
 
                     # 调用 Ollama
                     vector = self._ollama_client.embed_single(text, normalize=normalize)
+
+                    # 维度校验：Ollama 返回向量维度必须与配置一致，
+                    # 否则写入 Milvus 必然失败且难以排查
+                    if len(vector) != self._config.dimension:
+                        raise BusinessException(
+                            code=ErrorCode.EMBEDDING_FAILED[0],
+                            message=(
+                                f"Ollama 返回向量维度异常: 期望 {self._config.dimension}，"
+                                f"实际 {len(vector)}，请检查模型配置"
+                            )
+                        )
+
                     embeddings.append(vector)
-                    
+
+                except BusinessException:
+                    # 业务异常直接上抛，避免零向量污染向量库
+                    raise
                 except Exception as e:
-                    logger.warning(
+                    logger.error(
                         f"Ollama 向量化失败: {str(e)}, text={repr(text[:50])}",
                         extra={"error": str(e)}
                     )
-                    embeddings.append(np.zeros(self._config.dimension))
+                    # 运行期故障不再静默返回零向量：
+                    # 零向量入库会污染向量库且被标记为已向量化无法重试，
+                    # 改为抛异常让整批失败，chunk 保持 status=0 可重试
+                    raise BusinessException(
+                        code=ErrorCode.EMBEDDING_FAILED[0],
+                        message=f"Ollama 向量化失败: {str(e)}"
+                    )
 
             return embeddings
 
@@ -561,23 +582,24 @@ class ChunkEmbeddingService:
                 )
 
             # 准备向量化
+            # 注意：chunk_map 的 key 必须是 texts_to_embed 的压缩索引，
+            # 与 embeddings 返回顺序一一对应；若使用原始 enumerate 索引，
+            # 一旦存在空内容 chunk 被跳过，就会发生向量错位或 IndexError
             texts_to_embed = []
-            chunk_map = {}  # index -> (chunk, original_text)
+            chunk_map = {}  # 压缩索引 -> (chunk, text)
 
-            for i, chunk in enumerate(chunks):
+            for chunk in chunks:
                 # 使用增强内容或原始内容
                 text = chunk.enhanced_content if chunk.enhanced_content else chunk.content
                 # 跳过空内容
-                if not text:
-                    text = ""
-                if not text.strip():
+                if not text or not text.strip():
                     logger.warning(
                         f"跳过空内容的Chunk",
                         extra={"chunk_id": chunk.id, "document_id": document_id, "content": repr(chunk.content), "enhanced": repr(chunk.enhanced_content)}
                     )
                     continue
+                chunk_map[len(texts_to_embed)] = (chunk, text)
                 texts_to_embed.append(text)
-                chunk_map[i] = (chunk, text)
 
             logger.info(
                 f"准备向量化文本",
@@ -708,7 +730,8 @@ class ChunkEmbeddingService:
                                 }
                             )
                             failed_indices.append(i)
-                            failed_indices.append(results[i].chunk_id if i < len(results) else None)
+                            if i < len(results):
+                                failed_indices.append(results[i].chunk_id)
                     
                     # 尝试重新加载集合
                     try:
@@ -725,17 +748,20 @@ class ChunkEmbeddingService:
                     )
 
             # 更新数据库状态
+            # 按 chunk.id 精确映射 vector_id，避免原始索引与压缩索引错位，
+            # 防止空 chunk 被误标记为已向量化、真实 chunk 反而回落 status=0
+            chunk_id_to_vector = {}
+            for result in results:
+                chunk_id_to_vector[result.chunk_id] = result.vector_id
+
             for chunk in chunks:
-                chunk_index = chunks.index(chunk)
-                if chunk_index < len(results):
-                    if results[chunk_index].vector_id and results[chunk_index].vector_id > 0:
-                        chunk.status = 1  # 已向量化
-                        chunk.vector_id = results[chunk_index].vector_id
-                    else:
-                        chunk.status = 0  # 待向量化
-                        chunk.vector_id = None
+                vector_id = chunk_id_to_vector.get(chunk.id)
+                if vector_id:
+                    chunk.status = 1  # 已向量化
+                    chunk.vector_id = vector_id
                 else:
-                    chunk.status = 0  # 待向量化
+                    chunk.status = 0  # 待向量化（未向量化或插入失败，允许重试）
+                    chunk.vector_id = None
 
             db.commit()
 
@@ -756,7 +782,7 @@ class ChunkEmbeddingService:
                 document_id=document_id,
                 version_id=version_id,
                 total_chunks=len(chunks),
-                processed_chunks=len(chunks),
+                processed_chunks=len(results),  # 只统计实际向量化的chunk数，空内容chunk不计入
                 cached_count=cached_count,
                 results=results,
                 processing_time_ms=processing_time

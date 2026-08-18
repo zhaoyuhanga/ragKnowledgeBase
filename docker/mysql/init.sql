@@ -63,8 +63,8 @@ CREATE TABLE document_versions (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),
+    UNIQUE KEY uk_document_versions_file_hash (file_hash),
     INDEX idx_document_versions_document_id (document_id),
-    INDEX idx_document_versions_file_hash (file_hash),
     INDEX idx_document_versions_status (status),
     INDEX idx_document_versions_uploaded_at (uploaded_at),
     CONSTRAINT fk_doc_version_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE

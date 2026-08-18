@@ -17,7 +17,7 @@ from app.common.response import success_response, page_response
 from app.services.document_service import ImportTaskService
 from core.database import SessionLocal
 
-router = APIRouter(prefix="/import-tasks", tags=["导入任务"])
+router = APIRouter(tags=["导入任务"])
 
 
 def get_import_task_service() -> ImportTaskService:

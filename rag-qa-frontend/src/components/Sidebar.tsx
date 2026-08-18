@@ -68,8 +68,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onCollapse }) => {
     <Sider
       width={220}
       style={{
-        background: '#fff',
-        borderRight: '1px solid #f0f0f0',
+        background: 'linear-gradient(180deg, #001529 0%, #0b2b4d 100%)',
+        borderRight: 'none',
         height: '100vh',
         position: 'fixed',
         left: 0,
@@ -83,29 +83,19 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onCollapse }) => {
       onCollapse={onCollapse}
       trigger={null}
     >
-      <div style={{
-        height: 56,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: collapsed ? 'center' : 'flex-start',
-        padding: collapsed ? 0 : '0 16px',
-        borderBottom: '1px solid #f0f0f0',
-      }}>
+      <div className="app-brand">
+        <div className="app-brand-logo">R</div>
         {!collapsed && (
-          <span style={{ fontSize: 16, fontWeight: 600, color: '#1677ff' }}>
-            RAG知识库系统
-          </span>
-        )}
-        {collapsed && (
-          <span style={{ fontSize: 18, fontWeight: 700, color: '#1677ff' }}>R</span>
+          <span className="app-brand-title">RAG知识库系统</span>
         )}
       </div>
       <Menu
+        theme="dark"
         mode="inline"
         selectedKeys={[location.pathname]}
         items={menuItems}
         onClick={handleMenuClick}
-        style={{ borderRight: 0, marginTop: 8 }}
+        style={{ borderRight: 0, marginTop: 8, background: 'transparent' }}
       />
     </Sider>
   );

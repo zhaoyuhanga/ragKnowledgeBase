@@ -209,9 +209,9 @@ const QueueManagement: React.FC = () => {
       ellipsis: true,
     },
     {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
+      title: '失败时间',
+      dataIndex: 'failed_at',
+      key: 'failed_at',
       width: 180,
     },
     {

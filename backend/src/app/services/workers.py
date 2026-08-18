@@ -394,11 +394,36 @@ class ChunkWorker(QueueConsumer):
                 logger.warning(f"文档没有可切分的元素", extra={"document_id": document_id, "version_id": version_id})
                 return True
 
+            # 从消息中恢复清洗结果（CleanWorker 已把 clean_result 放入 payload）
+            # 使清洗后的文本与质量评分能真正进入切分与 document_chunks
+            cleaned_elements = None
+            clean_result_data = payload.get("clean_result")
+            if clean_result_data:
+                try:
+                    from app.schemas.cleaning import CleaningResult as CleaningResultModel
+                    clean_result_model = CleaningResultModel(**clean_result_data)
+                    cleaned_elements = clean_result_model.elements
+                    logger.info(
+                        f"恢复清洗结果成功",
+                        extra={
+                            "document_id": document_id,
+                            "version_id": version_id,
+                            "cleaned_count": len(cleaned_elements)
+                        }
+                    )
+                except Exception as restore_error:
+                    logger.warning(
+                        f"恢复清洗结果失败，将使用原始元素切分",
+                        extra={"document_id": document_id, "version_id": version_id, "error": str(restore_error)}
+                    )
+                    cleaned_elements = None
+
             # 调用切分服务
             result = self.chunk_service.chunk_document(
                 document_id=document_id,
                 version_id=version_id,
-                elements=elements
+                elements=elements,
+                cleaned_elements=cleaned_elements
             )
 
             # 保存Chunks到数据库

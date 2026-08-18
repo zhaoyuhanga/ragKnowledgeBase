@@ -212,7 +212,8 @@ class DocumentService:
         business_id: Optional[str] = None,
         business_name: Optional[str] = None,
         creator_id: Optional[int] = None,
-        creator_name: Optional[str] = None
+        creator_name: Optional[str] = None,
+        overwrite: bool = False
     ) -> Dict[str, Any]:
         """
         上传单个文档
@@ -223,13 +224,24 @@ class DocumentService:
             business_name: 业务归属名称
             creator_id: 创建人ID
             creator_name: 创建人姓名
+            overwrite: 是否覆盖同名文档（同名且业务归属相同时，复用文档并创建新版本）
 
         Returns:
             上传结果
         """
         db = SessionLocal()
+        # 记录已落盘的文件路径，后续 DB 阶段失败时清理，避免孤儿文件
+        saved_file_path: Optional[str] = None
         try:
             # ========== 阶段1：读取文件内容 ==========
+            # 若服务器已提供文件大小，先校验，避免超大文件整读入内存
+            max_size = self.storage_service.max_size
+            if file.size is not None and file.size > max_size:
+                raise BusinessException(
+                    code=ErrorCode.FILE_SIZE_TOO_LARGE[0],
+                    message=f"文件大小超出限制，最大支持 {max_size / (1024 * 1024):.0f}MB"
+                )
+
             logger.info(
                 f"开始上传文档",
                 extra={
@@ -361,6 +373,7 @@ class DocumentService:
                     doc_type=doc_type,
                     business_id=business_id
                 )
+                saved_file_path = file_info.file_path
                 logger.debug(
                     f"文件保存成功",
                     extra={
@@ -415,20 +428,42 @@ class DocumentService:
                     message=f"创建导入任务失败: {str(e)}"
                 )
 
-            # ========== 阶段7：创建文档记录 ==========
+            # ========== 阶段7：创建文档记录（同名文档 + overwrite 时复用并创建新版本） ==========
             try:
-                document = Document(
-                    name=file.filename,
-                    doc_type=doc_type,
-                    business_id=business_id,
-                    business_name=business_name,
-                    status=0,  # 待解析
-                    creator_id=creator_id,
-                    creator_name=creator_name
-                )
-                db.add(document)
-                db.flush()
-                
+                existing_doc = None
+                if overwrite:
+                    # 查找同名且同业务归属、未删除的文档
+                    existing_doc = db.query(Document).filter(
+                        Document.name == file.filename,
+                        Document.business_id == business_id,
+                        Document.is_deleted == 0
+                    ).first()
+
+                if existing_doc is not None:
+                    # 同名文档已存在：复用文档，由阶段8创建新版本（覆盖式更新）
+                    document = existing_doc
+                    logger.info(
+                        f"检测到同名文档，overwrite=True，将创建新版本",
+                        extra={
+                            "document_id": document.id,
+                            "file_name": file.filename,
+                            "business_id": business_id
+                        }
+                    )
+                else:
+                    # 新建文档记录
+                    document = Document(
+                        name=file.filename,
+                        doc_type=doc_type,
+                        business_id=business_id,
+                        business_name=business_name,
+                        status=0,  # 待解析
+                        creator_id=creator_id,
+                        creator_name=creator_name
+                    )
+                    db.add(document)
+                    db.flush()
+
                 logger.debug(
                     f"文档记录创建成功",
                     extra={
@@ -620,9 +655,15 @@ class DocumentService:
 
         except BusinessException:
             db.rollback()
+            # 清理已落盘但未入库成功的文件，避免孤儿文件
+            if saved_file_path:
+                self.storage_service.delete_file(saved_file_path)
             raise
         except Exception as e:
             db.rollback()
+            # 清理已落盘但未入库成功的文件，避免孤儿文件
+            if saved_file_path:
+                self.storage_service.delete_file(saved_file_path)
             logger.error(
                 f"文档上传失败",
                 extra={
@@ -644,8 +685,10 @@ class DocumentService:
         self,
         files: List[UploadFile],
         business_id: Optional[str] = None,
+        business_name: Optional[str] = None,
         creator_id: Optional[int] = None,
         creator_name: Optional[str] = None,
+        overwrite: bool = False,
         max_batch_size: int = 20
     ) -> Dict[str, Any]:
         """
@@ -654,8 +697,10 @@ class DocumentService:
         Args:
             files: 上传的文件列表
             business_id: 业务归属ID
+            business_name: 业务归属名称
             creator_id: 创建人ID
             creator_name: 创建人姓名
+            overwrite: 是否覆盖同名文档（同名且业务归属相同时，复用文档并创建新版本）
             max_batch_size: 最大批量大小
 
         Returns:
@@ -682,8 +727,10 @@ class DocumentService:
                 result = self.upload_document(
                     file=file,
                     business_id=business_id,
+                    business_name=business_name,
                     creator_id=creator_id,
-                    creator_name=creator_name
+                    creator_name=creator_name,
+                    overwrite=overwrite
                 )
 
                 results["success"] += 1

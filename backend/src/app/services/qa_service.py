@@ -247,8 +247,7 @@ class QAService:
         """
         流式问答接口
 
-        根据用户问题，流式生成答案。
-        注意：此方法会调用两次LLM（一次保存日志，一次流式输出）
+        根据用户问题，流式生成答案（真实流式：直接透传 LLM 的增量输出）。
 
         Args:
             question: 用户问题
@@ -325,8 +324,24 @@ class QAService:
                 context=assembled_context,
             )
 
-            # ========== 5. 流式LLM生成 ==========
-            # 返回生成器供流式输出
+            # ========== 5. 先落库问答日志（空答案，拿 qa_id 供前端取引用） ==========
+            # 流式结束后由 complete_qa_log 回填完整答案与生成耗时
+            qa_id = self._save_qa_log(
+                question=question,
+                answer="",
+                references=reranked_results,
+                session_id=session_id,
+                user_id=user_id,
+                tenant_id=tenant_id,
+                retrieval_time_ms=retrieval_time_ms,
+                rerank_time_ms=rerank_time_ms,
+                context_time_ms=context_time_ms,
+                generation_time_ms=0,
+                total_time_ms=0,
+            )
+
+            # ========== 6. 流式LLM生成 ==========
+            # 返回同步生成器，由路由层逐块转发（真流式，非生成完成后回放）
             answer_stream = self.llm_service.generate_stream(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
@@ -340,6 +355,7 @@ class QAService:
             logger.info(
                 "流式问答准备完成",
                 extra={
+                    "qa_id": qa_id,
                     "session_id": session_id,
                     "question": question[:50],
                     "retrieval_time_ms": retrieval_time_ms,
@@ -349,6 +365,7 @@ class QAService:
             )
 
             return {
+                "qa_id": qa_id,
                 "question": question,
                 "system_prompt": system_prompt,
                 "user_prompt": user_prompt,
@@ -475,6 +492,53 @@ class QAService:
             db.rollback()
             logger.error(f"保存问答日志失败: {str(e)}")
             raise
+        finally:
+            db.close()
+
+    def complete_qa_log(
+        self,
+        qa_id: int,
+        answer: str,
+        generation_time_ms: int = 0,
+        total_time_ms: int = 0
+    ) -> bool:
+        """
+        流式问答结束后回填问答日志（答案与耗时）
+
+        流式接口先以空答案落库获取 qa_id，流式输出完成后调用本方法回填。
+
+        Args:
+            qa_id: 问答日志ID
+            answer: 完整答案
+            generation_time_ms: 生成耗时（毫秒）
+            total_time_ms: 总耗时（毫秒）
+
+        Returns:
+            是否更新成功
+        """
+        from core.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            qa_log = db.query(QALog).filter(QALog.id == qa_id).first()
+            if not qa_log:
+                logger.warning(f"回填问答日志失败：日志不存在，qa_id={qa_id}")
+                return False
+
+            qa_log.answer = answer
+            qa_log.generation_time_ms = generation_time_ms
+            qa_log.total_time_ms = total_time_ms
+            db.commit()
+
+            logger.info(
+                f"问答日志回填完成",
+                extra={"qa_id": qa_id, "answer_length": len(answer)}
+            )
+            return True
+        except Exception as e:
+            db.rollback()
+            logger.error(f"回填问答日志失败: {str(e)}", extra={"qa_id": qa_id})
+            return False
         finally:
             db.close()
 

@@ -3,6 +3,7 @@ import { Layout } from 'antd';
 import Sidebar from './Sidebar';
 import AppHeader from './Header';
 import { Outlet } from 'react-router-dom';
+import { LAYOUT } from '../theme/tokens';
 
 const { Content } = Layout;
 
@@ -24,12 +25,12 @@ const AppLayout: React.FC = () => {
       <Layout>
         <Sidebar collapsed={collapsed} onCollapse={setCollapsed} />
         <Content
+          className="app-content"
           style={{
-            marginLeft: collapsed ? 80 : 220,
-            marginTop: 56,
-            padding: 24,
-            minHeight: 'calc(100vh - 56px)',
-            background: '#f5f5f5',
+            marginLeft: collapsed ? LAYOUT.siderCollapsedWidth : LAYOUT.siderWidth,
+            marginTop: LAYOUT.headerHeight,
+            padding: LAYOUT.contentPadding,
+            minHeight: `calc(100vh - ${LAYOUT.headerHeight}px)`,
             transition: 'margin-left 0.2s',
           }}
         >

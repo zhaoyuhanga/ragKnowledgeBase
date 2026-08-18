@@ -42,10 +42,12 @@ from core.database import SessionLocal
 # ================================================
 
 DESENSITIZATION_PATTERNS = {
-    "手机号": (r"1[3-9]\d{9}", "138****1234"),
-    "身份证号": (r"\d{17}[\dXx]", "310***********1234"),
+    # 注意：长数字串（身份证/银行卡）必须先于手机号匹配，
+    # 且手机号/银行卡/身份证模式需加数字边界，避免在大段数字内部误匹配
+    "身份证号": (r"(?<!\d)\d{17}[\dXx](?!\d)", "310***********1234"),
+    "银行卡号": (r"(?<!\d)\d{16,19}(?!\d)", "622202***********1234"),
+    "手机号": (r"(?<!\d)1[3-9]\d{9}(?!\d)", "138****1234"),
     "邮箱": (r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", "user@example.com"),
-    "银行卡号": (r"\d{16,19}", "622202***********1234"),
     "IP地址": (r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", "192.168.***.***"),
 }
 
@@ -120,6 +122,8 @@ class CleaningRuleItem:
     rule_type: str
     config: Dict[str, Any]
     priority: int
+    scope: Optional[str] = None  # 适用范围（来自模型列，非 rule_config）
+    is_enabled: int = 1  # 是否启用（来自模型列，非 rule_config）
 
 
 @dataclass
@@ -143,6 +147,8 @@ class CleaningReport:
     quality_score: float = 1.0
     quality_flag: str = "good"
     is_duplicate: bool = False
+    # 规则命中明细：[{rule_id, rule_type, rule_name}]，用于清洗日志与 effect_count
+    rule_hits: List[Dict[str, Any]] = field(default_factory=list)
 
 
 # ================================================
@@ -193,9 +199,9 @@ class CleanService:
         # 应用筛选条件
         filtered_rules = []
         for rule in rules:
-            if enabled_only and rule.config.get("is_enabled", 1) == 0:
+            if enabled_only and rule.is_enabled == 0:
                 continue
-            if scope and scope != "all" and rule.config.get("scope") not in [None, "all", scope]:
+            if scope and scope != "all" and rule.scope not in [None, "all", scope]:
                 continue
             if rule_type and rule.rule_type != rule_type:
                 continue
@@ -220,7 +226,9 @@ class CleanService:
                     name=rule.name,
                     rule_type=rule.rule_type,
                     config=rule.rule_config or {},
-                    priority=rule.priority
+                    priority=rule.priority,
+                    scope=rule.scope,
+                    is_enabled=rule.is_enabled
                 ))
 
             logger.info(
@@ -246,7 +254,9 @@ class CleanService:
                 name=rule_config["name"],
                 rule_type=rule_config["rule_type"],
                 config=rule_config,
-                priority=rule_config.get("priority", 100)
+                priority=rule_config.get("priority", 100),
+                scope=rule_config.get("scope"),
+                is_enabled=rule_config.get("is_enabled", 1)
             ))
         return rules
 
@@ -418,8 +428,9 @@ class CleanService:
 
         # 2. 应用清洗规则（噪声过滤）
         if config.enable_noise_removal:
-            current_content, applied_rules = self._apply_cleaning_rules(current_content, context)
+            current_content, applied_rules, rule_hits = self._apply_cleaning_rules(current_content, context)
             report.applied_rules.extend(applied_rules)
+            report.rule_hits.extend(rule_hits)
 
         # 3. 敏感信息脱敏
         if config.enable_desensitization:
@@ -494,7 +505,7 @@ class CleanService:
         self,
         text: str,
         context: CleaningContext
-    ) -> Tuple[str, List[str]]:
+    ) -> Tuple[str, List[str], List[Dict[str, Any]]]:
         """
         应用清洗规则
 
@@ -503,9 +514,10 @@ class CleanService:
             context: 清洗上下文
 
         Returns:
-            (清洗后的文本, 应用的规则名称列表)
+            (清洗后的文本, 应用的规则名称列表, 规则命中明细列表)
         """
         applied_rules = []
+        rule_hits: List[Dict[str, Any]] = []
         current_text = text
 
         for rule_item in context.rules:
@@ -517,6 +529,11 @@ class CleanService:
                         current_text = re.sub(pattern, "", current_text)
                         if rule_item.name not in applied_rules:
                             applied_rules.append(rule_item.name)
+                        rule_hits.append({
+                            "rule_id": rule_item.rule_id,
+                            "rule_type": rule_item.rule_type,
+                            "rule_name": rule_item.name
+                        })
 
             elif rule_item.rule_type == "regex_replace":
                 # 正则替换
@@ -526,8 +543,13 @@ class CleanService:
                     current_text = re.sub(pattern, replacement, current_text)
                     if rule_item.name not in applied_rules:
                         applied_rules.append(rule_item.name)
+                    rule_hits.append({
+                        "rule_id": rule_item.rule_id,
+                        "rule_type": rule_item.rule_type,
+                        "rule_name": rule_item.name
+                    })
 
-        return current_text, applied_rules
+        return current_text, applied_rules, rule_hits
 
     def _desensitize(self, text: str) -> Tuple[str, bool]:
         """
@@ -604,7 +626,7 @@ class CleanService:
         # 检查文本长度
         if len(text) < 10:
             issues.append("文本内容过短")
-            score *= 0.8
+            score *= 0.5  # 过短文本显著降级，避免无实质内容仍被标记为 good
         elif len(text) > 50000:
             issues.append("文本内容过长")
             score *= 0.9
@@ -678,11 +700,22 @@ class CleanService:
         if not report.applied_rules:
             return
 
-        for rule_name in report.applied_rules:
+        # 记录规则命中明细（rule_id/rule_type 来自模型，不再为空）
+        hit_details = report.rule_hits or []
+        if not hit_details:
+            # 兼容非规则类清洗（编码修复/脱敏等）：按名称记一条
+            hit_details = [{"rule_id": None, "rule_type": "builtin", "rule_name": name}
+                           for name in report.applied_rules]
+
+        for hit in hit_details:
+            rule_id = hit.get("rule_id")
             log = CleaningLog(
                 document_id=document_id,
                 version_id=version_id,
                 element_id=element_id,
+                rule_id=rule_id,
+                rule_name=hit.get("rule_name"),
+                rule_type=hit.get("rule_type"),
                 action="clean",
                 before_content=report.original_content[:200] if len(report.original_content) > 200 else report.original_content,
                 after_content=report.cleaned_content[:200] if len(report.cleaned_content) > 200 else report.cleaned_content,
@@ -690,14 +723,86 @@ class CleanService:
             )
             db.add(log)
 
+            # 累加规则的生效次数（仅真实入库规则，默认规则 rule_id 为负）
+            if isinstance(rule_id, int) and rule_id > 0:
+                try:
+                    db.query(CleaningRule).filter(CleaningRule.id == rule_id).update(
+                        {CleaningRule.effect_count: CleaningRule.effect_count + 1}
+                    )
+                except Exception as e:
+                    logger.warning(f"累加清洗规则生效次数失败: {str(e)}", extra={"rule_id": rule_id})
+
     # ================================================
     # 规则管理方法
     # ================================================
+
+    @staticmethod
+    def _validate_rule_config(rule_type: str, rule_config: Dict[str, Any]) -> None:
+        """
+        校验清洗规则正则配置（防 ReDoS 与非法正则）
+
+        检查项：
+        1. 正则必须可编译
+        2. 单条正则长度限制（500字符）
+        3. 拒绝嵌套量词等灾难性回溯模式（如 (a+)+、(a|a)+）
+
+        Args:
+            rule_type: 规则类型（regex_delete / regex_replace）
+            rule_config: 规则配置
+
+        Raises:
+            BusinessException: 配置非法时抛出
+        """
+        patterns: List[str] = []
+        if rule_type == "regex_delete":
+            patterns = list(rule_config.get("patterns") or [])
+        elif rule_type == "regex_replace":
+            pattern = rule_config.get("pattern")
+            if pattern:
+                patterns = [pattern]
+
+        if not patterns:
+            return
+
+        # 灾难性回溯启发式：嵌套/成组量词或交替组叠加外层量词
+        # （如 (a+)+、(a*)*、(.+)*、(a|a)+、(com|org)+ 等）
+        # 注意：这是启发式检测，完整防护需使用支持超时的 regex 模块
+        catastrophic_pattern = re.compile(
+            r"\([^)]*(?:[+*{][^)]*|\|[^)]*)\)[+*{]",
+            re.IGNORECASE
+        )
+
+        for pattern in patterns:
+            if not isinstance(pattern, str) or not pattern.strip():
+                raise BusinessException(
+                    code=ErrorCode.PARAM_INVALID[0],
+                    message="清洗规则正则不能为空"
+                )
+            if len(pattern) > 500:
+                raise BusinessException(
+                    code=ErrorCode.PARAM_INVALID[0],
+                    message=f"清洗规则正则过长（最多500字符），当前 {len(pattern)} 字符"
+                )
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                raise BusinessException(
+                    code=ErrorCode.PARAM_INVALID[0],
+                    message=f"清洗规则正则有误: {str(e)}"
+                )
+            if catastrophic_pattern.search(pattern):
+                raise BusinessException(
+                    code=ErrorCode.PARAM_INVALID[0],
+                    message=f"清洗规则正则存在灾难性回溯风险，已拒绝: {pattern[:50]}"
+                )
 
     def create_rule(self, rule_data: CleaningRuleCreate) -> CleaningRuleResponse:
         """创建清洗规则"""
         db = SessionLocal()
         try:
+            # 校验正则配置，防止非法正则与 ReDoS
+            self._validate_rule_config(rule_data.rule_type, rule_data.rule_config)
+
             rule = CleaningRule(
                 name=rule_data.name,
                 rule_type=rule_data.rule_type,
@@ -747,6 +852,9 @@ class CleanService:
             for key, value in update_data.items():
                 if value is not None:
                     setattr(rule, key, value)
+
+            # 校验正则配置，防止非法正则与 ReDoS
+            self._validate_rule_config(rule.rule_type, rule.rule_config)
 
             db.commit()
             db.refresh(rule)

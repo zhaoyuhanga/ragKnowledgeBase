@@ -35,7 +35,7 @@ from app.services.queue_consumer import get_queue_publisher, QueuePublisher
 from core.config import settings
 
 
-router = APIRouter(prefix="/queue", tags=["队列管理"])
+router = APIRouter(tags=["队列管理"])
 
 
 def get_publisher() -> QueuePublisher:
